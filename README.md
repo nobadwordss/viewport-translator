@@ -12,6 +12,10 @@ Translate text in place as you scroll. Viewport Translator uses the LLM API you 
 
 The interface follows your browser's language preferences, with English as the fallback. You can also select English, Korean, Japanese, Simplified Chinese or Traditional Chinese in settings. The target language is a separate setting.
 
+## Mobile browsers
+
+Use Tampermonkey with [Firefox for Android](https://addons.mozilla.org/android/addon/tampermonkey/) or [Safari on iPhone and iPad](https://www.tampermonkey.net/index.php?browser=safari&locale=en). Open **Translator Settings** from Tampermonkey to enable translation on a site for the first time. On a touch device, the **Translate** button then lets you show the original, open settings, or turn translation off for that site. You can enable `m.reddit.com` and `m.bilibili.com` separately if your browser opens those addresses.
+
 ## Providers and privacy
 
 - Built-in providers are OpenAI, Anthropic, Gemini, xAI and DeepSeek. For OpenAI-compatible services, choose **Custom**, enter the API base URL (for example `https://openrouter.ai/api/v1` or `http://localhost:11434/v1`), and use **Refresh Models** or enter a model ID. HTTP is limited to loopback addresses. A custom API key is optional and tied to its base URL. If you installed v0.4.0 and used a custom API key, enter it again after updating.
@@ -29,6 +33,8 @@ Viewport Translator는 스크롤하면서 화면에 들어온 텍스트를 웹�
 3. **이 사이트에서 자동 번역 켜기**를 선택하고 저장합니다. **Alt+Shift+T**로 사이트 번역을 켜거나 끄고, **Alt+T**로 원문과 번역문을 전환합니다. 원문을 보는 동안에는 새 번역 요청이 일시 정지됩니다.
 
 설정 화면의 언어는 브라우저 설정을 따르며, 지원하지 않는 언어는 영어로 표시합니다. 설정에서 영어, 한국어, 일본어, 중국어 간체·번체 중 하나를 직접 고를 수도 있습니다.
+
+모바일에서는 [Android용 Firefox의 Tampermonkey](https://addons.mozilla.org/android/addon/tampermonkey/) 또는 [iPhone·iPad용 Safari의 Tampermonkey](https://www.tampermonkey.net/index.php?browser=safari&locale=en)를 사용할 수 있습니다. 처음에는 Tampermonkey 메뉴의 **화면 번역 설정**에서 사이트 번역을 켭니다. 터치 기기에서는 이후 페이지의 **번역** 버튼으로 원문 보기, 설정, 사이트 번역 끄기를 선택할 수 있습니다. 브라우저가 `m.reddit.com`이나 `m.bilibili.com`을 열면 해당 주소에서 각각 번역을 켤 수 있습니다.
 
 - OpenAI, Anthropic, Gemini, xAI, DeepSeek를 기본 지원합니다. OpenAI 호환 API를 사용하려면 **Custom**을 선택하고 Base URL과 모델 ID를 입력합니다. **모델 목록 새로고침**으로 모델을 조회할 수도 있습니다. 원격 API에는 HTTPS가 필요합니다. 커스텀 API 키는 선택 사항이며 입력한 주소에 연결됩니다. v0.4.0에서 커스텀 API 키를 사용했다면 업데이트 후 다시 입력합니다.
 - 화면에 들어온 텍스트 구간은 선택한 API에 전송됩니다. 한 구간에 화면 밖의 인접 텍스트가 포함될 수 있습니다. 제공자, 모델, 번역 대상 언어는 번역을 켠 모든 사이트에 공통으로 적용됩니다. API 이용 요금과 데이터 보관 정책은 제공자에 따라 달라집니다.

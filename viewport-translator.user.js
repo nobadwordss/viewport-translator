@@ -5,7 +5,7 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.4.1
+// @version 0.5.0
 // @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, and Bilibili.
 // @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili 전용 규칙을 지원합니다.
 // @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili専用ルールにも対応。
@@ -41,8 +41,9 @@
 
   const UI_STRINGS = {
     en: {
-      menuToggleSite: (site, on) => `${on ? "Disable" : "Enable"} on ${site} (Alt+Shift+T)`,
-      menuToggleOriginal: orig => orig ? "Show Translated Text (Alt+T)" : "Show Original Text (Alt+T)",
+      touchLabel: "Translate",
+      menuToggleSite: (site, on) => `${on ? "Disable" : "Enable"} on ${site}`,
+      menuToggleOriginal: orig => orig ? "Show Translated Text" : "Show Original Text",
       menuSettings: "Translator Settings",
       title: "Visible Text Translator Settings",
       uiLanguage: "UI language",
@@ -100,13 +101,14 @@
       toastSiteEnabled: site => `Auto-translate enabled on ${site}.`,
       toastSiteDisabled: site => `Auto-translate disabled on ${site}.`,
       toastSiteNeedsSetup: "Configure your API provider first to enable translation.",
-      toastOriginalOn: "Showing original text (Alt+T to restore).",
-      toastOriginalOff: "Showing translated text (Alt+T for original).",
-      toastEnableFirst: site => `Translation is off on ${site}. Press Alt+Shift+T to enable.`,
+      toastOriginalOn: "Showing original text.",
+      toastOriginalOff: "Showing translated text.",
+      toastEnableFirst: site => `Translation is off on ${site}.`,
     },
     ko: {
-      menuToggleSite: (site, on) => `${site} 자동 번역 ${on ? "끄기" : "켜기"} (Alt+Shift+T)`,
-      menuToggleOriginal: orig => orig ? "번역문 보기 (Alt+T)" : "원문 보기 (Alt+T)",
+      touchLabel: "번역",
+      menuToggleSite: (site, on) => `${site} 자동 번역 ${on ? "끄기" : "켜기"}`,
+      menuToggleOriginal: orig => orig ? "번역문 보기" : "원문 보기",
       menuSettings: "화면 번역 설정",
       title: "화면 텍스트 번역 설정",
       uiLanguage: "UI 언어",
@@ -164,13 +166,14 @@
       toastSiteEnabled: site => `${site} 자동 번역을 켰습니다.`,
       toastSiteDisabled: site => `${site} 자동 번역을 껐습니다.`,
       toastSiteNeedsSetup: "먼저 설정에서 API 제공자와 모델을 구성하세요.",
-      toastOriginalOn: "원문 표시 중 (Alt+T로 번역문 복원)",
-      toastOriginalOff: "번역문 표시 중 (Alt+T로 원문 보기)",
-      toastEnableFirst: site => `${site}에서 번역이 꺼져 있습니다. Alt+Shift+T로 켜세요.`,
+      toastOriginalOn: "원문 표시 중",
+      toastOriginalOff: "번역문 표시 중",
+      toastEnableFirst: site => `${site}에서 번역이 꺼져 있습니다.`,
     },
     ja: {
-      menuToggleSite: (site, on) => `${site} の自動翻訳を${on ? "オフ" : "オン"} (Alt+Shift+T)`,
-      menuToggleOriginal: orig => orig ? "翻訳を表示 (Alt+T)" : "原文を表示 (Alt+T)",
+      touchLabel: "翻訳",
+      menuToggleSite: (site, on) => `${site} の自動翻訳を${on ? "オフ" : "オン"}`,
+      menuToggleOriginal: orig => orig ? "翻訳を表示" : "原文を表示",
       menuSettings: "表示テキスト翻訳の設定",
       title: "表示テキスト翻訳の設定",
       uiLanguage: "UI言語",
@@ -228,13 +231,14 @@
       toastSiteEnabled: site => `${site} の自動翻訳をオンにしました。`,
       toastSiteDisabled: site => `${site} の自動翻訳をオフにしました。`,
       toastSiteNeedsSetup: "先に設定でAPIプロバイダーとモデルを構成してください。",
-      toastOriginalOn: "原文を表示中（Alt+Tで翻訳に戻す）",
-      toastOriginalOff: "翻訳を表示中（Alt+Tで原文表示）",
-      toastEnableFirst: site => `${site} の翻訳はオフです。Alt+Shift+Tでオンにできます。`,
+      toastOriginalOn: "原文を表示中",
+      toastOriginalOff: "翻訳を表示中",
+      toastEnableFirst: site => `${site} の翻訳はオフです。`,
     },
     "zh-Hans": {
-      menuToggleSite: (site, on) => `${on ? "关闭" : "开启"} ${site} 自动翻译 (Alt+Shift+T)`,
-      menuToggleOriginal: orig => orig ? "显示译文 (Alt+T)" : "显示原文 (Alt+T)",
+      touchLabel: "翻译",
+      menuToggleSite: (site, on) => `${on ? "关闭" : "开启"} ${site} 自动翻译`,
+      menuToggleOriginal: orig => orig ? "显示译文" : "显示原文",
       menuSettings: "可见文本翻译设置",
       title: "可见文本翻译设置",
       uiLanguage: "界面语言",
@@ -292,13 +296,14 @@
       toastSiteEnabled: site => `已为 ${site} 开启自动翻译。`,
       toastSiteDisabled: site => `已为 ${site} 关闭自动翻译。`,
       toastSiteNeedsSetup: "请先在设置中配置 API 服务商和模型。",
-      toastOriginalOn: "当前显示原文（按 Alt+T 恢复译文）",
-      toastOriginalOff: "当前显示译文（按 Alt+T 查看原文）",
-      toastEnableFirst: site => `${site} 未开启翻译，请按 Alt+Shift+T 启用。`,
+      toastOriginalOn: "当前显示原文",
+      toastOriginalOff: "当前显示译文",
+      toastEnableFirst: site => `${site} 未开启翻译。`,
     },
     "zh-Hant": {
-      menuToggleSite: (site, on) => `${on ? "關閉" : "開啟"} ${site} 自動翻譯 (Alt+Shift+T)`,
-      menuToggleOriginal: orig => orig ? "顯示譯文 (Alt+T)" : "顯示原文 (Alt+T)",
+      touchLabel: "翻譯",
+      menuToggleSite: (site, on) => `${on ? "關閉" : "開啟"} ${site} 自動翻譯`,
+      menuToggleOriginal: orig => orig ? "顯示譯文" : "顯示原文",
       menuSettings: "可見文字翻譯設定",
       title: "可見文字翻譯設定",
       uiLanguage: "介面語言",
@@ -356,9 +361,9 @@
       toastSiteEnabled: site => `已為 ${site} 開啟自動翻譯。`,
       toastSiteDisabled: site => `已為 ${site} 關閉自動翻譯。`,
       toastSiteNeedsSetup: "請先在設定中配置 API 服務商與模型。",
-      toastOriginalOn: "目前顯示原文（按 Alt+T 恢復譯文）",
-      toastOriginalOff: "目前顯示譯文（按 Alt+T 檢視原文）",
-      toastEnableFirst: site => `${site} 未開啟翻譯，請按 Alt+Shift+T 啟用。`,
+      toastOriginalOn: "目前顯示原文",
+      toastOriginalOff: "目前顯示譯文",
+      toastEnableFirst: site => `${site} 未開啟翻譯。`,
     },
   };
 
@@ -531,6 +536,11 @@
     ".video-page-card-small a.title", ".opus-module-title__text", ".opus-module-content",
     "#commentapp .list-item.reply-wrap .con > p.text", "#commentapp .reply-item .text-con",
   ].join(",");
+  const BILI_MOBILE_TARGETS = [
+    BILI_TARGETS,
+    ".m-video-info .title", ".m-video-info .desc",
+    ".v-card .title", ".video-list .card-box .title",
+  ].join(",");
   const BILI_COMMENT_HOSTS = new Map([
     ["bili-comments", "bili-comment-thread-renderer"],
     ["bili-comment-thread-renderer", "bili-comment-renderer, bili-comment-replies-renderer"],
@@ -541,7 +551,10 @@
   ]);
 
   // Tier 1: Generic fallback engine
-  const GENERIC_TARGETS = "p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, dt, dd, figcaption";
+  const TEXT_BLOCK = [
+    "p", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "td", "th", "dt", "dd", "figcaption",
+    "[role='heading']", "[role='listitem']", "[role='cell']", "[role='columnheader']", "[role='rowheader']",
+  ].join(",");
   const GENERIC_EXCLUDED = [
     "nav", "footer", "aside", "dialog", "[role='dialog']", "[role='alertdialog']",
     "[role='navigation']", "[role='banner']",
@@ -563,7 +576,6 @@
     "a.quotelink", "a.deadlink", ".abbr", ".expando-button", ".md-spoiler-text:not(.revealed)",
     "reddit-spoiler:not([revealed])", "shreddit-spoiler:not([revealed])", "s", "del",
   ].join(",");
-  const TEXT_BLOCK = "p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, dt, dd, figcaption";
   const CHARS_PER_PART = 460;
   const CHARS_PER_BATCH = 2800;
   const PARTS_PER_BATCH = 24;
@@ -1066,17 +1078,26 @@
     GM_setValue(keyName(provider), provider === "custom" ? { baseUrl, value } : value);
   }
 
-  const isReddit = /^(?:(?:www|old)\.)?reddit\.com$/.test(location.hostname);
+  const isMobileReddit = location.hostname === "m.reddit.com";
+  const isReddit = isMobileReddit || /^(?:(?:www|old)\.)?reddit\.com$/.test(location.hostname);
   const is4chan = /^boards\.4chan(?:nel)?\.org$/.test(location.hostname);
-  const isBilibili = /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
+  const isMobileBilibili = location.hostname === "m.bilibili.com";
+  const isBilibili = isMobileBilibili || /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
   const isGeneric = !isReddit && !is4chan && !isBilibili;
-  const CURRENT_SITE = isReddit ? "reddit.com"
+  // Keep opt-in for each mobile subdomain explicit, including existing preferences.
+  const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
+    : isReddit ? "reddit.com"
     : is4chan ? "4chan.org"
     : isBilibili ? "bilibili.com"
     : location.hostname.toLowerCase().replace(/^www\./, "");
   // Keep the existing board opt-in separate from the generic landing page.
   const SITE_KEY = isGeneric && CURRENT_SITE === "4chan.org" ? "host:4chan.org" : CURRENT_SITE;
-  const selector = isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : GENERIC_TARGETS;
+  const isMobileSite = isMobileReddit || isMobileBilibili;
+  const selector = isMobileBilibili ? `${BILI_MOBILE_TARGETS},${TEXT_BLOCK}`
+    : isMobileReddit ? `${REDDIT_TARGETS},${TEXT_BLOCK}`
+    : isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : TEXT_BLOCK;
+  const touchInput = window.matchMedia("(pointer: coarse)");
+  const visualViewport = window.visualViewport;
 
   const targets = new Set();
   const visibleTargets = new Set();
@@ -1106,6 +1127,7 @@
   let toastHost;
   let toastBox;
   let toastTimer;
+  let touchControls;
   let menuCommandIds = [];
   let menusRegistered = false;
 
@@ -1124,6 +1146,7 @@
   }
 
   function browsePage() {
+    if (isMobileSite) return true;
     const path = location.pathname;
     if (isBilibili) {
       const page = path.replace(/^\/(?:zh-Hans|zh-Hant|en|ja|ko)(?=\/|$)/, "") || "/";
@@ -1155,6 +1178,9 @@
         }
         .toast.visible { opacity: .96; transform: translateY(0); }
         .toast.error { border-color: #d94848; }
+        @media (pointer: coarse) {
+          .toast { bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)); }
+        }
       `;
       toastBox = document.createElement("div");
       toastBox.className = "toast";
@@ -1187,10 +1213,102 @@
       const id = GM_registerMenuCommand(label, handler);
       if (id !== undefined) menuCommandIds.push(id);
     };
-    add(ui.menuToggleSite(CURRENT_SITE, isSiteEnabled()), toggleCurrentSite);
-    add(ui.menuToggleOriginal(showingOriginal), toggleOriginalView);
+    add(ui.menuToggleSite(CURRENT_SITE, isSiteEnabled()) + (touchInput.matches ? "" : " (Alt+Shift+T)"), toggleCurrentSite);
+    add(ui.menuToggleOriginal(showingOriginal) + (touchInput.matches ? "" : " (Alt+T)"), toggleOriginalView);
     add(ui.menuSettings, openSettings);
     menusRegistered = true;
+  }
+
+  function actionButton(label, handler, type = "button") {
+    const button = document.createElement("button");
+    button.type = type;
+    button.textContent = label;
+    if (handler) button.addEventListener("click", event => {
+      if (event.isTrusted) handler();
+    });
+    return button;
+  }
+
+  function syncTouchControls() {
+    if (!touchInput.matches || !isSiteEnabled()) {
+      touchControls?.host.remove();
+      touchControls = undefined;
+      return;
+    }
+    if (!touchControls) {
+      const host = document.createElement("div");
+      const shadow = host.attachShadow({ mode: "closed" });
+      const style = document.createElement("style");
+      style.textContent = `
+        :host {
+          all: initial; position: fixed; z-index: 2147483646;
+          right: calc(var(--viewport-right, 0px) + env(safe-area-inset-right, 0px) + .75rem);
+          bottom: calc(var(--viewport-bottom, 0px) + env(safe-area-inset-bottom, 0px) + .75rem);
+          color-scheme: light dark; color: CanvasText;
+          font: 400 1rem/1.35 system-ui, sans-serif;
+        }
+        details { position: relative; }
+        summary, button { box-sizing: border-box; min-height: 44px; font: inherit; cursor: pointer; color: inherit; }
+        summary {
+          list-style: none; display: flex; align-items: center;
+          padding: .4rem .8rem; border: 1px solid GrayText; border-radius: 999px;
+          background: Canvas; box-shadow: 0 .15rem .65rem rgb(0 0 0 / 25%);
+        }
+        summary::-webkit-details-marker { display: none; }
+        .actions {
+          position: absolute; bottom: calc(100% + .35rem); right: 0;
+          width: min(16rem, calc(var(--viewport-width, 100vw) - 2rem));
+          padding: .3rem; border: 1px solid GrayText; border-radius: .7rem;
+          background: Canvas; box-shadow: 0 .15rem .65rem rgb(0 0 0 / 25%);
+        }
+        button { display: block; width: 100%; text-align: start; border: 0; border-radius: .35rem;
+          background: transparent; padding: .4rem .6rem; overflow-wrap: anywhere; }
+        button:disabled { color: GrayText; }
+        button:active, button:focus-visible, summary:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
+      `;
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const closeThen = action => () => {
+        details.open = false;
+        action();
+      };
+      const original = actionButton("", closeThen(toggleOriginalView));
+      const configure = actionButton("", closeThen(openSettings));
+      const disable = actionButton("", closeThen(toggleCurrentSite));
+      actions.append(original, configure, disable);
+      details.append(summary, actions);
+      shadow.append(style, details);
+      touchControls = { host, summary, original, configure, disable };
+    }
+    const { host, summary, original, configure, disable } = touchControls;
+    host.lang = uiLocale;
+    summary.textContent = ui.touchLabel;
+    original.textContent = ui.menuToggleOriginal(showingOriginal);
+    original.disabled = !providerReady();
+    configure.textContent = ui.menuSettings;
+    disable.textContent = ui.menuToggleSite(CURRENT_SITE, true);
+    if (!host.isConnected) document.documentElement.append(host);
+    layoutTouchInterface();
+  }
+
+  function layoutTouchInterface() {
+    if (!visualViewport || !touchInput.matches) return;
+    const { offsetLeft, offsetTop, width, height } = visualViewport;
+    if (touchControls?.host.isConnected) {
+      const { clientWidth, clientHeight } = document.documentElement;
+      const { style } = touchControls.host;
+      style.setProperty("--viewport-right", `${Math.max(0, clientWidth - offsetLeft - width)}px`);
+      style.setProperty("--viewport-bottom", `${Math.max(0, clientHeight - offsetTop - height)}px`);
+      style.setProperty("--viewport-width", `${width}px`);
+    }
+    if (dialog) {
+      dialog.style.setProperty("--viewport-width", `${width}px`);
+      dialog.style.setProperty("--viewport-height", `${height}px`);
+      dialog.style.setProperty("--viewport-center", `${offsetLeft + width / 2}px`);
+      dialog.style.setProperty("--viewport-top", `${offsetTop}px`);
+    }
   }
 
   function setSiteEnabled(enable) {
@@ -1245,6 +1363,7 @@
       schedule(0);
     }
     registerMenus();
+    syncTouchControls();
   }
 
   async function translationCacheKey(config, originalNodeText, sourcePart) {
@@ -1497,6 +1616,7 @@
     blocked = false;
     lastStatus = "";
     registerMenus();
+    syncTouchControls();
     begin();
   }
 
@@ -1526,11 +1646,13 @@
     if (!element || element === document.documentElement) {
       let root = clipCache?.get(document.documentElement);
       if (!root) {
+        const { clientWidth, clientHeight } = document.documentElement;
+        const { offsetLeft = 0, offsetTop = 0, width = clientWidth, height = clientHeight } = visualViewport ?? {};
         root = {
-          left: 0,
-          top: 0,
-          right: document.documentElement.clientWidth,
-          bottom: document.documentElement.clientHeight,
+          left: Math.max(0, offsetLeft),
+          top: Math.max(0, offsetTop),
+          right: Math.min(clientWidth, offsetLeft + width),
+          bottom: Math.min(clientHeight, offsetTop + height),
         };
         clipCache?.set(document.documentElement, root);
       }
@@ -1581,7 +1703,7 @@
       if (ancestor.closest(EXCLUDED)) return true;
       if (!is4chan && ancestor.closest("form")) return true;
     }
-    if (isGeneric) {
+    if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
       const header = element.closest("header");
       if (header && !header.closest("article, main, [role='main']")) return true;
@@ -1803,6 +1925,16 @@
       .hint { opacity:.82; font-size:.84rem; }
       .actions { display:flex; flex-wrap:wrap; gap:.5rem; }
       .submit { justify-content:flex-end; }
+      dialog[data-touch] {
+        inset: calc(var(--viewport-top, 0px) + .75rem) auto auto var(--viewport-center, 50%);
+        transform: translateX(-50%); margin: 0;
+        width: min(30rem, calc(var(--viewport-width, 100vw) - 1.5rem));
+        max-height: calc(var(--viewport-height, 100dvh) - 1.5rem);
+        padding: 1rem; overscroll-behavior: contain;
+      }
+      dialog[data-touch] :is(button, select, input:not([type="checkbox"])) { min-height: 44px; font-size: max(16px, 1rem); }
+      dialog[data-touch] .toggle { min-height: 44px; }
+      dialog[data-touch] .shortcuts { display: none; }
     `;
     const title = document.createElement("h2");
     title.textContent = ui.title;
@@ -1860,7 +1992,7 @@
     const modelStatus = document.createElement("p");
     modelStatus.setAttribute("role", "status");
     const shortcuts = document.createElement("p");
-    shortcuts.className = "hint";
+    shortcuts.className = "hint shortcuts";
     shortcuts.textContent = ui.shortcutsHint;
     const notice = document.createElement("p");
     notice.className = "hint";
@@ -2051,30 +2183,21 @@
       }
     });
 
-    const button = (label, handler, type = "button") => {
-      const element = document.createElement("button");
-      element.type = type;
-      element.textContent = label;
-      if (handler) element.addEventListener("click", event => {
-        if (event.isTrusted) handler();
-      });
-      return element;
-    };
     const keyActions = document.createElement("div");
     keyActions.className = "actions";
-    const deleteKeyBtn = button(ui.deleteKey, () => {
+    const deleteKeyBtn = actionButton(ui.deleteKey, () => {
       if (!readApiKey(provider.value, normalizeBaseUrl(customUrlInput.value))) return;
       const selected = selectedModel();
       GM_deleteValue(keyName(provider.value));
       if (settings.provider === provider.value) updateSettings();
       updateProvider(selected);
     });
-    const refresh = button(ui.refreshModels, () => updateProvider(selectedModel(), true));
-    keyActions.append(button(ui.saveKey, saveApiKey), deleteKeyBtn, refresh);
+    const refresh = actionButton(ui.refreshModels, () => updateProvider(selectedModel(), true));
+    keyActions.append(actionButton(ui.saveKey, saveApiKey), deleteKeyBtn, refresh);
     const actions = document.createElement("div");
     actions.className = "actions submit";
-    const save = button(ui.save, null, "submit");
-    actions.append(button(ui.cancel, () => panel.close()), save);
+    const save = actionButton(ui.save, null, "submit");
+    actions.append(actionButton(ui.cancel, () => panel.close()), save);
     form.append(keyStatus, keyActions, modelStatus, shortcuts, notice, status, actions);
     form.addEventListener("submit", event => {
       event.preventDefault();
@@ -2130,6 +2253,8 @@
     shadow.append(style, panel);
     document.documentElement.append(host);
     dialog = panel;
+    panel.toggleAttribute("data-touch", touchInput.matches);
+    layoutTouchInterface();
     panel.addEventListener("close", () => {
       cancelLookup();
       host.remove();
@@ -2154,6 +2279,12 @@
   });
 
   registerMenus();
+  syncTouchControls();
+  touchInput.addEventListener("change", () => {
+    dialog?.toggleAttribute("data-touch", touchInput.matches);
+    registerMenus();
+    syncTouchControls();
+  });
   GM_addValueChangeListener(SETTINGS, (_name, _old, _new, remote) => {
     if (remote) updateSettings();
   });
@@ -2174,6 +2305,12 @@
   });
   window.addEventListener("scroll", scheduleScroll, { passive: true, capture: true });
   window.addEventListener("resize", () => schedule(), { passive: true });
+  function onVisualViewportChange() {
+    layoutTouchInterface();
+    schedule();
+  }
+  visualViewport?.addEventListener("resize", onVisualViewportChange, { passive: true });
+  visualViewport?.addEventListener("scroll", onVisualViewportChange, { passive: true });
   document.addEventListener("visibilitychange", () => schedule());
   if (is4chan) {
     document.addEventListener("4chanXInitFinished", scanChanEvent);
