@@ -5,7 +5,7 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.5.2
+// @version 0.5.3
 // @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, and Linux.do.
 // @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do 전용 규칙을 지원합니다.
 // @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do専用ルールにも対応。
@@ -544,14 +544,24 @@
     ["bili-comment-reply-renderer", "bili-rich-text"],
     ["bili-rich-text", ""],
   ]);
+  const LINUX_DO_SIDEBAR = ":is(#d-sidebar, .sidebar-hamburger-dropdown)";
+  const LINUX_DO_SIDEBAR_SECTIONS = `${LINUX_DO_SIDEBAR} .sidebar-section:is([data-section-name='community'], [data-section-name='资源'], [data-section-name='categories'], [data-section-name='tags'])`;
+  const LINUX_DO_SIDEBAR_HEADING = `${LINUX_DO_SIDEBAR_SECTIONS} button.sidebar-section-header > .sidebar-section-header-text`;
+  const LINUX_DO_SIDEBAR_TARGETS = [
+    `${LINUX_DO_SIDEBAR_SECTIONS} .sidebar-section-link-content-text`,
+    LINUX_DO_SIDEBAR_HEADING,
+    `${LINUX_DO_SIDEBAR} .sidebar-theme-toggle-dropdown summary .select-kit-selected-name > .name`,
+  ].join(",");
   const LINUX_DO_TARGETS = [
     ".topic-list a.raw-topic-link", ".topic-list .topic-excerpt",
     "#topic-title a.fancy-title", ".topic-post .cooked",
+    LINUX_DO_SIDEBAR_TARGETS,
   ].join(",");
   const LINUX_DO_EXCLUDED = [
     "#reply-control", ".d-editor", "aside.quote > .title",
     ".mention", ".mention-group", ".spoiler-blurred", ".topic-excerpt-more",
   ].join(",");
+  const LINUX_DO_FORUM_PATH = /^\/(?:$|(?:t|c|categories|tag|tags|latest|new|unread|unseen|top|hot)(?:\/|$))/;
   const LINUX_DO_TOPIC_PATH = /^\/t\//;
 
   // Tier 1: Generic fallback engine
@@ -574,12 +584,13 @@
   const CHAN_POST_CONTEXT = ".post, .inline, #qp";
   const CHAN_EXCLUDED = "a.backlink, a.hashlink, .stub, .prettyprint, .sjis";
   const EXCLUDED = [
-    "script", "style", "noscript", "iframe", "svg", "math", "button", "label", "input", "select",
+    "script", "style", "noscript", "iframe", "svg", "math", "label", "input", "select",
     "textarea", "[contenteditable]:not([contenteditable='false'])", "[translate='no']", ".notranslate",
     "[hidden]", "[aria-hidden='true']", "[inert]", "pre", "code", "kbd", "samp", "var",
     "a.quotelink", "a.deadlink", ".abbr", ".expando-button", ".md-spoiler-text:not(.revealed)",
     "reddit-spoiler:not([revealed])", "shreddit-spoiler:not([revealed])", "s", "del",
   ].join(",");
+  const EXCLUDED_WITH_BUTTONS = `button,${EXCLUDED}`;
   const CHARS_PER_PART = 460;
   const CHARS_PER_BATCH = 2800;
   const PARTS_PER_BATCH = 24;
@@ -1165,9 +1176,6 @@
     if (isReddit) {
       return /^\/(?:$|(?:r|u|user|comments|search|popular|all|best|hot|new|rising|top|controversial)(?:\/|$))/.test(path);
     }
-    if (isLinuxDo) {
-      return /^\/(?:$|(?:t|c|categories|tag|tags|latest|new|unread|unseen|top|hot)(?:\/|$))/.test(path);
-    }
     return true;
   }
 
@@ -1636,14 +1644,19 @@
   }
 
   function excluded(element) {
+    const sidebarLabel = isLinuxDo ? element.closest(LINUX_DO_SIDEBAR_TARGETS) : null;
+    const selectors = sidebarLabel?.matches(LINUX_DO_SIDEBAR_HEADING) ? EXCLUDED : EXCLUDED_WITH_BUTTONS;
     for (let ancestor = element; ancestor; ancestor = isBilibili ? ancestor.getRootNode().host : null) {
-      if (ancestor.closest(EXCLUDED)) return true;
+      if (ancestor.closest(selectors)) return true;
       if (!is4chan && ancestor.closest("form")) return true;
     }
     if (isLinuxDo) {
+      if (element.closest(LINUX_DO_EXCLUDED)) return true;
+      if (sidebarLabel) return false;
+      const path = location.pathname;
+      if (!LINUX_DO_FORUM_PATH.test(path)) return true;
       // Direct messages also use /t/ URLs. Wait for Discourse to identify a regular topic.
-      if (LINUX_DO_TOPIC_PATH.test(location.pathname) && !document.body?.classList.contains("archetype-regular")) return true;
-      return Boolean(element.closest(LINUX_DO_EXCLUDED));
+      return LINUX_DO_TOPIC_PATH.test(path) && !document.body?.classList.contains("archetype-regular");
     }
     if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
