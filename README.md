@@ -2,7 +2,7 @@
 
 [한국어](#한국어)
 
-Translate text in place as you scroll. Viewport Translator uses the LLM API you configure and starts with translation disabled on every site. It handles common page elements and has dedicated rules for Reddit, 4chan and Bilibili.
+Translate text in place as you scroll. Viewport Translator uses the LLM API you configure and starts with translation disabled on every site. It handles common page elements and has dedicated rules for Reddit, 4chan, Bilibili and Linux.do.
 
 ## Install and use
 
@@ -26,7 +26,7 @@ Report bugs through [GitHub Issues](https://github.com/nobadwordss/viewport-tran
 
 ## 한국어
 
-Viewport Translator는 스크롤하면서 화면에 들어온 텍스트를 웹페이지에서 바로 번역합니다. 일반 웹페이지에 적용할 수 있고, Reddit·4chan·Bilibili에는 전용 규칙을 사용합니다. 처음에는 모든 사이트에서 번역이 꺼져 있습니다.
+Viewport Translator는 스크롤하면서 화면에 들어온 텍스트를 웹페이지에서 바로 번역합니다. 일반 웹페이지에 적용할 수 있고, Reddit·4chan·Bilibili·Linux.do에는 전용 규칙을 사용합니다. 처음에는 모든 사이트에서 번역이 꺼져 있습니다.
 
 1. 최신 [Tampermonkey](https://www.tampermonkey.net/)를 설치한 뒤 [Greasy Fork에서 유저스크립트를 설치](https://greasyfork.org/ko/scripts/606658-visible-text-translator)합니다.
 2. Tampermonkey 메뉴에서 **화면 번역 설정**을 열고 번역 대상 언어, API 제공자, 모델을 선택합니다. 제공자가 요구하는 경우 API 키를 입력합니다.

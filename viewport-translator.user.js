@@ -5,12 +5,12 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.5.1
-// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, and Bilibili.
-// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili 전용 규칙을 지원합니다.
-// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili専用ルールにも対応。
-// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan 和 Bilibili 专用规则。
-// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan 和 Bilibili 專用規則。
+// @version 0.5.2
+// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, and Linux.do.
+// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do 전용 규칙을 지원합니다.
+// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do専用ルールにも対応。
+// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili 和 Linux.do 专用规则。
+// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili 和 Linux.do 專用規則。
 // @license MIT
 // @homepageURL https://github.com/nobadwordss/viewport-translator
 // @supportURL https://github.com/nobadwordss/viewport-translator/issues
@@ -544,6 +544,15 @@
     ["bili-comment-reply-renderer", "bili-rich-text"],
     ["bili-rich-text", ""],
   ]);
+  const LINUX_DO_TARGETS = [
+    ".topic-list a.raw-topic-link", ".topic-list .topic-excerpt",
+    "#topic-title a.fancy-title", ".topic-post .cooked",
+  ].join(",");
+  const LINUX_DO_EXCLUDED = [
+    "#reply-control", ".d-editor", "aside.quote > .title",
+    ".mention", ".mention-group", ".spoiler-blurred", ".topic-excerpt-more",
+  ].join(",");
+  const LINUX_DO_TOPIC_PATH = /^\/t\//;
 
   // Tier 1: Generic fallback engine
   const TEXT_BLOCK = [
@@ -1078,7 +1087,8 @@
   const is4chan = /^boards\.4chan(?:nel)?\.org$/.test(location.hostname);
   const isMobileBilibili = location.hostname === "m.bilibili.com";
   const isBilibili = isMobileBilibili || /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
-  const isGeneric = !isReddit && !is4chan && !isBilibili;
+  const isLinuxDo = /^(?:www\.)?linux\.do$/.test(location.hostname);
+  const isGeneric = !isReddit && !is4chan && !isBilibili && !isLinuxDo;
   // Keep opt-in for each mobile subdomain explicit, including existing preferences.
   const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
     : isReddit ? "reddit.com"
@@ -1090,6 +1100,7 @@
   const isMobileSite = isMobileReddit || isMobileBilibili;
   const selector = isMobileBilibili ? `${BILI_MOBILE_TARGETS},${TEXT_BLOCK}`
     : isMobileReddit ? `${REDDIT_TARGETS},${TEXT_BLOCK}`
+    : isLinuxDo ? LINUX_DO_TARGETS
     : isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : TEXT_BLOCK;
   const touchInput = window.matchMedia("(pointer: coarse)");
   const visualViewport = window.visualViewport;
@@ -1136,6 +1147,10 @@
   }
 
   function currentRoute() {
+    if (isLinuxDo) {
+      // Discourse updates the reply number in the URL as the reader scrolls.
+      return location.pathname.replace(/^(\/t\/[^/]+\/\d+)\/\d+\/?$/, "$1") + location.search;
+    }
     return isBilibili || isGeneric ? location.pathname + location.search : location.pathname;
   }
 
@@ -1149,6 +1164,9 @@
     }
     if (isReddit) {
       return /^\/(?:$|(?:r|u|user|comments|search|popular|all|best|hot|new|rising|top|controversial)(?:\/|$))/.test(path);
+    }
+    if (isLinuxDo) {
+      return /^\/(?:$|(?:t|c|categories|tag|tags|latest|new|unread|unseen|top|hot)(?:\/|$))/.test(path);
     }
     return true;
   }
@@ -1621,6 +1639,11 @@
     for (let ancestor = element; ancestor; ancestor = isBilibili ? ancestor.getRootNode().host : null) {
       if (ancestor.closest(EXCLUDED)) return true;
       if (!is4chan && ancestor.closest("form")) return true;
+    }
+    if (isLinuxDo) {
+      // Direct messages also use /t/ URLs. Wait for Discourse to identify a regular topic.
+      if (LINUX_DO_TOPIC_PATH.test(location.pathname) && !document.body?.classList.contains("archetype-regular")) return true;
+      return Boolean(element.closest(LINUX_DO_EXCLUDED));
     }
     if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
