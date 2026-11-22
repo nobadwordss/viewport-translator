@@ -5,7 +5,7 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.5.0
+// @version 0.5.1
 // @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, and Bilibili.
 // @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili 전용 규칙을 지원합니다.
 // @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili専用ルールにも対応。
@@ -41,7 +41,6 @@
 
   const UI_STRINGS = {
     en: {
-      touchLabel: "Translate",
       menuToggleSite: (site, on) => `${on ? "Disable" : "Enable"} on ${site}`,
       menuToggleOriginal: orig => orig ? "Show Translated Text" : "Show Original Text",
       menuSettings: "Translator Settings",
@@ -106,7 +105,6 @@
       toastEnableFirst: site => `Translation is off on ${site}.`,
     },
     ko: {
-      touchLabel: "번역",
       menuToggleSite: (site, on) => `${site} 자동 번역 ${on ? "끄기" : "켜기"}`,
       menuToggleOriginal: orig => orig ? "번역문 보기" : "원문 보기",
       menuSettings: "화면 번역 설정",
@@ -171,7 +169,6 @@
       toastEnableFirst: site => `${site}에서 번역이 꺼져 있습니다.`,
     },
     ja: {
-      touchLabel: "翻訳",
       menuToggleSite: (site, on) => `${site} の自動翻訳を${on ? "オフ" : "オン"}`,
       menuToggleOriginal: orig => orig ? "翻訳を表示" : "原文を表示",
       menuSettings: "表示テキスト翻訳の設定",
@@ -236,7 +233,6 @@
       toastEnableFirst: site => `${site} の翻訳はオフです。`,
     },
     "zh-Hans": {
-      touchLabel: "翻译",
       menuToggleSite: (site, on) => `${on ? "关闭" : "开启"} ${site} 自动翻译`,
       menuToggleOriginal: orig => orig ? "显示译文" : "显示原文",
       menuSettings: "可见文本翻译设置",
@@ -301,7 +297,6 @@
       toastEnableFirst: site => `${site} 未开启翻译。`,
     },
     "zh-Hant": {
-      touchLabel: "翻譯",
       menuToggleSite: (site, on) => `${on ? "關閉" : "開啟"} ${site} 自動翻譯`,
       menuToggleOriginal: orig => orig ? "顯示譯文" : "顯示原文",
       menuSettings: "可見文字翻譯設定",
@@ -1127,7 +1122,6 @@
   let toastHost;
   let toastBox;
   let toastTimer;
-  let touchControls;
   let menuCommandIds = [];
   let menusRegistered = false;
 
@@ -1179,7 +1173,7 @@
         .toast.visible { opacity: .96; transform: translateY(0); }
         .toast.error { border-color: #d94848; }
         @media (pointer: coarse) {
-          .toast { bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)); }
+          .toast { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
         }
       `;
       toastBox = document.createElement("div");
@@ -1229,86 +1223,13 @@
     return button;
   }
 
-  function syncTouchControls() {
-    if (!touchInput.matches || !isSiteEnabled()) {
-      touchControls?.host.remove();
-      touchControls = undefined;
-      return;
-    }
-    if (!touchControls) {
-      const host = document.createElement("div");
-      const shadow = host.attachShadow({ mode: "closed" });
-      const style = document.createElement("style");
-      style.textContent = `
-        :host {
-          all: initial; position: fixed; z-index: 2147483646;
-          right: calc(var(--viewport-right, 0px) + env(safe-area-inset-right, 0px) + .75rem);
-          bottom: calc(var(--viewport-bottom, 0px) + env(safe-area-inset-bottom, 0px) + .75rem);
-          color-scheme: light dark; color: CanvasText;
-          font: 400 1rem/1.35 system-ui, sans-serif;
-        }
-        details { position: relative; }
-        summary, button { box-sizing: border-box; min-height: 44px; font: inherit; cursor: pointer; color: inherit; }
-        summary {
-          list-style: none; display: flex; align-items: center;
-          padding: .4rem .8rem; border: 1px solid GrayText; border-radius: 999px;
-          background: Canvas; box-shadow: 0 .15rem .65rem rgb(0 0 0 / 25%);
-        }
-        summary::-webkit-details-marker { display: none; }
-        .actions {
-          position: absolute; bottom: calc(100% + .35rem); right: 0;
-          width: min(16rem, calc(var(--viewport-width, 100vw) - 2rem));
-          padding: .3rem; border: 1px solid GrayText; border-radius: .7rem;
-          background: Canvas; box-shadow: 0 .15rem .65rem rgb(0 0 0 / 25%);
-        }
-        button { display: block; width: 100%; text-align: start; border: 0; border-radius: .35rem;
-          background: transparent; padding: .4rem .6rem; overflow-wrap: anywhere; }
-        button:disabled { color: GrayText; }
-        button:active, button:focus-visible, summary:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
-      `;
-      const details = document.createElement("details");
-      const summary = document.createElement("summary");
-      const actions = document.createElement("div");
-      actions.className = "actions";
-      const closeThen = action => () => {
-        details.open = false;
-        action();
-      };
-      const original = actionButton("", closeThen(toggleOriginalView));
-      const configure = actionButton("", closeThen(openSettings));
-      const disable = actionButton("", closeThen(toggleCurrentSite));
-      actions.append(original, configure, disable);
-      details.append(summary, actions);
-      shadow.append(style, details);
-      touchControls = { host, summary, original, configure, disable };
-    }
-    const { host, summary, original, configure, disable } = touchControls;
-    host.lang = uiLocale;
-    summary.textContent = ui.touchLabel;
-    original.textContent = ui.menuToggleOriginal(showingOriginal);
-    original.disabled = !providerReady();
-    configure.textContent = ui.menuSettings;
-    disable.textContent = ui.menuToggleSite(CURRENT_SITE, true);
-    if (!host.isConnected) document.documentElement.append(host);
-    layoutTouchInterface();
-  }
-
-  function layoutTouchInterface() {
-    if (!visualViewport || !touchInput.matches) return;
+  function layoutTouchDialog() {
+    if (!dialog || !visualViewport || !touchInput.matches) return;
     const { offsetLeft, offsetTop, width, height } = visualViewport;
-    if (touchControls?.host.isConnected) {
-      const { clientWidth, clientHeight } = document.documentElement;
-      const { style } = touchControls.host;
-      style.setProperty("--viewport-right", `${Math.max(0, clientWidth - offsetLeft - width)}px`);
-      style.setProperty("--viewport-bottom", `${Math.max(0, clientHeight - offsetTop - height)}px`);
-      style.setProperty("--viewport-width", `${width}px`);
-    }
-    if (dialog) {
-      dialog.style.setProperty("--viewport-width", `${width}px`);
-      dialog.style.setProperty("--viewport-height", `${height}px`);
-      dialog.style.setProperty("--viewport-center", `${offsetLeft + width / 2}px`);
-      dialog.style.setProperty("--viewport-top", `${offsetTop}px`);
-    }
+    dialog.style.setProperty("--viewport-width", `${width}px`);
+    dialog.style.setProperty("--viewport-height", `${height}px`);
+    dialog.style.setProperty("--viewport-center", `${offsetLeft + width / 2}px`);
+    dialog.style.setProperty("--viewport-top", `${offsetTop}px`);
   }
 
   function setSiteEnabled(enable) {
@@ -1363,7 +1284,6 @@
       schedule(0);
     }
     registerMenus();
-    syncTouchControls();
   }
 
   async function translationCacheKey(config, originalNodeText, sourcePart) {
@@ -1616,7 +1536,6 @@
     blocked = false;
     lastStatus = "";
     registerMenus();
-    syncTouchControls();
     begin();
   }
 
@@ -2254,7 +2173,7 @@
     document.documentElement.append(host);
     dialog = panel;
     panel.toggleAttribute("data-touch", touchInput.matches);
-    layoutTouchInterface();
+    layoutTouchDialog();
     panel.addEventListener("close", () => {
       cancelLookup();
       host.remove();
@@ -2279,11 +2198,10 @@
   });
 
   registerMenus();
-  syncTouchControls();
   touchInput.addEventListener("change", () => {
     dialog?.toggleAttribute("data-touch", touchInput.matches);
+    layoutTouchDialog();
     registerMenus();
-    syncTouchControls();
   });
   GM_addValueChangeListener(SETTINGS, (_name, _old, _new, remote) => {
     if (remote) updateSettings();
@@ -2306,7 +2224,7 @@
   window.addEventListener("scroll", scheduleScroll, { passive: true, capture: true });
   window.addEventListener("resize", () => schedule(), { passive: true });
   function onVisualViewportChange() {
-    layoutTouchInterface();
+    layoutTouchDialog();
     schedule();
   }
   visualViewport?.addEventListener("resize", onVisualViewportChange, { passive: true });
