@@ -5,7 +5,7 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.6.0
+// @version 0.6.1
 // @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, and Linux.do.
 // @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do 전용 규칙을 지원합니다.
 // @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do専用ルールにも対応。
@@ -117,7 +117,7 @@
       privacyBlocked: "Privacy protection blocks translation on this page.",
       setKey: "Set API Key…",
       keyPrompt: endpoint => `Enter the API key for ${endpoint}. The browser prompt displays what you type.`,
-      transportUnavailable: "Update Tampermonkey to send requests with redirect protection.",
+      transportUnavailable: "Redirect-safe requests are unavailable. Use current Tampermonkey or Violentmonkey in Firefox.",
     },
     ko: {
       menuToggleSite: (site, on) => `${site} 자동 번역 ${on ? "끄기" : "켜기"}`,
@@ -191,7 +191,7 @@
       privacyBlocked: "개인정보 보호 규칙에 따라 이 페이지의 번역이 차단됩니다.",
       setKey: "API 키 설정…",
       keyPrompt: endpoint => `${endpoint}의 API 키를 입력하세요. 브라우저 창에 입력한 키가 표시됩니다.`,
-      transportUnavailable: "리디렉션 차단 기능을 사용하려면 Tampermonkey를 업데이트하세요.",
+      transportUnavailable: "현재 환경에서는 리디렉션을 차단할 수 없습니다. 최신 Tampermonkey 또는 Firefox용 Violentmonkey를 사용하세요.",
     },
     ja: {
       menuToggleSite: (site, on) => `${site} の自動翻訳を${on ? "オフ" : "オン"}`,
@@ -265,7 +265,7 @@
       privacyBlocked: "プライバシー保護によりこのページの翻訳はブロックされています。",
       setKey: "APIキーを設定…",
       keyPrompt: endpoint => `${endpoint} のAPIキーを入力してください。入力内容はブラウザーのダイアログに表示されます。`,
-      transportUnavailable: "リダイレクトをブロックしてリクエストを送るには、Tampermonkeyを更新してください。",
+      transportUnavailable: "この環境ではリダイレクトをブロックできません。最新のTampermonkeyまたはFirefox版Violentmonkeyを使用してください。",
     },
     "zh-Hans": {
       menuToggleSite: (site, on) => `${on ? "关闭" : "开启"} ${site} 自动翻译`,
@@ -339,7 +339,7 @@
       privacyBlocked: "隐私保护规则已阻止翻译此页面。",
       setKey: "设置 API 密钥…",
       keyPrompt: endpoint => `请输入 ${endpoint} 的 API 密钥。浏览器对话框会显示输入的内容。`,
-      transportUnavailable: "请更新 Tampermonkey，以便发送阻止重定向的请求。",
+      transportUnavailable: "当前环境无法阻止重定向。请使用最新版 Tampermonkey 或 Firefox 上的 Violentmonkey。",
     },
     "zh-Hant": {
       menuToggleSite: (site, on) => `${on ? "關閉" : "開啟"} ${site} 自動翻譯`,
@@ -413,7 +413,7 @@
       privacyBlocked: "隱私保護規則已封鎖此頁面的翻譯。",
       setKey: "設定 API 金鑰…",
       keyPrompt: endpoint => `請輸入 ${endpoint} 的 API 金鑰。瀏覽器的對話框會顯示輸入的內容。`,
-      transportUnavailable: "請更新 Tampermonkey，以便傳送阻止重新導向的請求。",
+      transportUnavailable: "目前的環境無法阻止重新導向。請使用最新版 Tampermonkey 或 Firefox 上的 Violentmonkey。",
     },
   };
 
@@ -960,12 +960,21 @@
       !/[\u0000-\u0008\u000e-\u001f]/u.test(text);
   }
 
-  function transportSupported() {
+  function selectTransport() {
+    // Firefox Manifest V2 exposes content.fetch alongside the privileged fetch.
+    // Violentmonkey's GM_xmlhttpRequest automatically follows redirects.
+    if (GM_info.scriptHandler === "Violentmonkey" && GM_info.injectInto === "content" &&
+      GM_info.platform?.browserName === "Firefox" && typeof content !== "undefined" &&
+      typeof content?.fetch === "function" && typeof fetch === "function") return "firefox";
+
     const version = /^(\d+)\.(\d+)/.exec(GM_info.version ?? "");
     // The redirect option needs Tampermonkey build 6180 or later.
-    return GM_info.scriptHandler === "Tampermonkey" && Boolean(version) &&
-      (Number(version[1]) > 5 || (Number(version[1]) === 5 && Number(version[2]) >= 2));
+    if (GM_info.scriptHandler === "Tampermonkey" && version &&
+      (Number(version[1]) > 5 || (Number(version[1]) === 5 && Number(version[2]) >= 2))) return "gm";
+    return null;
   }
+
+  const transport = selectTransport();
 
   function requestJson({ method, url, headers, body, timeout, permit }) {
     let request;
@@ -979,10 +988,42 @@
         fail("timeout");
         request?.abort?.();
       }, timeout);
+      const finish = (status, responseUrl, responseText, retryAfter) => {
+        clearTimeout(deadline);
+        if (status < 200 || status >= 300) {
+          fail(status, Number(retryAfter) || 0);
+          return;
+        }
+        try {
+          if (responseUrl && responseUrl !== url) throw new Error("Unexpected response URL");
+          if (responseText.length > 1500000) throw new Error("Oversized response");
+          resolve(JSON.parse(responseText));
+        } catch {
+          fail("response");
+        }
+      };
       try {
         const data = body === undefined ? undefined : JSON.stringify(body);
-        if (!transportSupported() || (permit && !permit())) {
+        if (!transport || (permit && !permit())) {
           fail("aborted");
+          return;
+        }
+        if (transport === "firefox") {
+          const controller = new AbortController();
+          request = controller;
+          // The privileged fetch can cross origins with this mode. A page-context
+          // fetch would instead block cross-origin requests before sending any data.
+          fetch(url, {
+            method, headers, body: data, signal: controller.signal, mode: "same-origin",
+            credentials: "omit", redirect: "error", referrerPolicy: "no-referrer", cache: "no-store",
+          }).then(async response => {
+            if (!response.ok) {
+              finish(response.status, response.url, "", response.headers.get("retry-after"));
+              await response.body?.cancel();
+              return;
+            }
+            finish(response.status, response.url, await response.text());
+          }).catch(() => fail(controller.signal.aborted ? "aborted" : "network"));
           return;
         }
         request = GM_xmlhttpRequest({
@@ -992,21 +1033,8 @@
           onerror: () => fail("network"),
           ontimeout: () => fail("timeout"),
           onload(response) {
-            clearTimeout(deadline);
-            if (response.status < 200 || response.status >= 300) {
-              const retryAfter = Number(/^retry-after:\s*(\d+)/im.exec(response.responseHeaders ?? "")?.[1]) || 0;
-              fail(response.status, retryAfter);
-              return;
-            }
-            try {
-              if (response.finalUrl && response.finalUrl !== url) {
-                throw new Error("Unexpected response URL");
-              }
-              if (response.responseText.length > 1500000) throw new Error("Oversized response");
-              resolve(JSON.parse(response.responseText));
-            } catch {
-              fail("response");
-            }
+            finish(response.status, response.finalUrl, response.responseText,
+              /^retry-after:\s*(\d+)/im.exec(response.responseHeaders ?? "")?.[1]);
           },
         });
       } catch {
@@ -1515,7 +1543,7 @@
       showToast(ui.privacyBlocked, true);
       return;
     }
-    if (!transportSupported()) {
+    if (!transport) {
       showToast(ui.transportUnavailable, true);
       return;
     }
@@ -1856,7 +1884,7 @@
 
   function translationAllowed(policy = readSitePolicy()) {
     return policy.enabled && !pageSuspended && !showingOriginal && !dialog && !document.hidden &&
-      providerReady() && transportSupported() && currentRoute() === route && routeAllowed(policy) && documentAllowed();
+      providerReady() && transport && currentRoute() === route && routeAllowed(policy) && documentAllowed();
   }
 
   function refreshPage() {
@@ -1872,7 +1900,7 @@
     if (!policy.enabled || policy.siteBlocked) showingOriginal = false;
     routeProtected = policy.enabled && (!routeAllowed(policy) || !documentAllowed());
     const allowed = policy.enabled && !routeProtected && !pageSuspended && !showingOriginal &&
-      !dialog && !document.hidden && providerReady() && transportSupported();
+      !dialog && !document.hidden && providerReady() && transport;
     if (allowed && !observer) {
       if (quarantineOnResume) {
         // SPA navigation can leave the previous protected view in the document after the URL changes.
@@ -1888,7 +1916,7 @@
 
     // An opted-in page can recover after late metadata or a SPA move without attaching an observer to a blocked page.
     if (policy.enabled && !policy.siteBlocked && !pageSuspended && !document.hidden && !showingOriginal && !dialog &&
-      providerReady() && transportSupported()) {
+      providerReady() && transport) {
       routeTimer ??= setTimeout(() => {
         routeTimer = undefined;
         if (cachePolicy.persistent) maintainTranslationCache();
@@ -2348,7 +2376,7 @@
     notice.textContent = ui.notice;
     const status = document.createElement("p");
     status.setAttribute("role", "status");
-    status.textContent = !transportSupported() ? ui.transportUnavailable
+    status.textContent = !transport ? ui.transportUnavailable
       : !routeAllowed(sitePolicyAtOpen) || !documentAllowed() ? ui.privacyBlocked : lastStatus;
     status.hidden = !status.textContent;
 
@@ -2443,9 +2471,9 @@
       keyStatus.textContent = providerKey ? ui.keySaved : custom ? ui.keyOptional : ui.keyRequired;
       deleteKeyBtn.disabled = !providerKey;
 
-      refresh.disabled = !transportSupported() || (custom ? !baseUrl : !providerKey);
+      refresh.disabled = !transport || (custom ? !baseUrl : !providerKey);
 
-      if (!transportSupported()) {
+      if (!transport) {
         modelStatus.textContent = ui.transportUnavailable;
         renderModels(selected);
         return;

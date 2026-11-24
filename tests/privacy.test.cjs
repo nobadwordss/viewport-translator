@@ -47,6 +47,7 @@ async function browserTests() {
     const {
       path = "/", host = "example.test", scheme = "https:", html = "<p>Public article text</p>",
       shared = storage(), incognito = false, managerVersion = "5.5.1", touch = false, setup,
+      scriptHandler = "Tampermonkey", browserName = "Firefox", injectInto = "content", firefoxContent = true,
     } = options;
     const frame = document.createElement("iframe");
     const ready = new Promise(resolve => { frame.onload = resolve; });
@@ -78,7 +79,28 @@ async function browserTests() {
     };
     const mocks = {
       location,
-      GM_info: { scriptHandler: "Tampermonkey", version: managerVersion, isIncognito: incognito },
+      GM_info: { scriptHandler, version: managerVersion, isIncognito: incognito, injectInto, platform: { browserName } },
+      content: firefoxContent ? { fetch() {} } : undefined,
+      fetch(url, init) {
+        return new Promise((resolve, reject) => {
+          const details = {
+            url, method: init.method, headers: init.headers, data: init.body,
+            onload(response) {
+              resolve({
+                ok: response.status >= 200 && response.status < 300, status: response.status,
+                url: response.finalUrl, text: async () => response.responseText,
+                headers: new win.Headers(),
+              });
+            },
+          };
+          const call = { details, fetchOptions: init, aborted: false };
+          requests.push(call);
+          init.signal.addEventListener("abort", () => {
+            call.aborted = true;
+            reject(new Error("Aborted"));
+          }, { once: true });
+        });
+      },
       GM_getValue: name => shared.values.get(name),
       GM_setValue: (name, value) => shared.write(name, value, { origin: frame }),
       GM_deleteValue: name => shared.write(name, undefined, { origin: frame }),
@@ -344,6 +366,33 @@ async function browserTests() {
       await until(() => tab.doc.body.textContent.includes("Translated text"), "Normal response did not render");
       assert(diskKeys(tab.shared.values).length === 0, "Default settings persisted a translation");
     }],
+    ["Violentmonkey Firefox translates public Reddit posts with redirect protection", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["reddit.com"]]]);
+      const config = {
+        shared, scriptHandler: "Violentmonkey", managerVersion: "2.50.0",
+        host: "www.reddit.com", path: "/r/fixture",
+        html: "<shreddit-post><p slot=title>Public Reddit post</p></shreddit-post>" +
+          "<shreddit-post nsfw><p slot=title>Private marked post</p></shreddit-post>",
+      };
+      const tab = await open(config);
+      await waitRequest(tab);
+      const call = tab.requests[0];
+      assert(call.fetchOptions?.redirect === "error" && call.fetchOptions.credentials === "omit" &&
+        call.fetchOptions.mode === "same-origin" && call.fetchOptions.referrerPolicy === "no-referrer",
+      "Violentmonkey did not use the isolated Firefox request with redirect and credential restrictions");
+      assert(call.details.data.includes("Public Reddit post") && !call.details.data.includes("Private marked post"),
+        "Violentmonkey did not preserve Reddit post filtering");
+      complete(call);
+      await until(() => tab.doc.body.textContent.includes("Translated text"), "Violentmonkey response did not render");
+
+      for (const flags of [
+        { browserName: "Chrome" }, { firefoxContent: false }, { injectInto: "page" }, { incognito: true },
+      ]) {
+        const blocked = await open({ ...config, ...flags });
+        await noSend(blocked, "Violentmonkey sent text without a verified private transport");
+        assert(blocked.watches.size === 0, "Violentmonkey started observation in an unsupported context");
+      }
+    }],
     ["provider compatibility and custom endpoint key binding", async () => {
       const providers = [
         ["anthropic", "https://api.anthropic.com/v1/messages", "x-api-key", false],
@@ -467,5 +516,5 @@ test("privacy regression suite in Firefox", { timeout: 60_000 }, async t => {
     throw new Error(`Firefox exited (${code})\n${logs}`);
   })]);
   assert.deepEqual(report.failures, []);
-  t.diagnostic(`${report.count} browser scenarios passed with mocked Tampermonkey storage and HTTP requests.`);
+  t.diagnostic(`${report.count} browser scenarios passed with mocked userscript storage and HTTP requests.`);
 });
