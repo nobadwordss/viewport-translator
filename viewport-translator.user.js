@@ -5,7 +5,7 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.5.3
+// @version 0.6.0
 // @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, and Linux.do.
 // @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do 전용 규칙을 지원합니다.
 // @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do専用ルールにも対応。
@@ -17,6 +17,7 @@
 // @match https://*/*
 // @match http://*/*
 // @run-at document-idle
+// @run-in normal-tabs
 // @inject-into content
 // @sandbox DOM
 // @noframes
@@ -28,6 +29,8 @@
 // @grant GM_listValues
 // @grant GM_addValueChangeListener
 // @grant GM_xmlhttpRequest
+// @grant GM_info
+// @grant window.onurlchange
 // @connect api.openai.com
 // @connect api.anthropic.com
 // @connect generativelanguage.googleapis.com
@@ -38,6 +41,8 @@
 
 (() => {
   "use strict";
+
+  if (typeof GM_info === "undefined" || GM_info.isIncognito !== false) return;
 
   const UI_STRINGS = {
     en: {
@@ -56,11 +61,6 @@
       customModelPlaceholder: "e.g. meta-llama/llama-3.3-70b-instruct:free",
       speed: "Response speed",
       effort: "Reasoning effort",
-      apiKey: "API key",
-      apiKeyPlaceholder: "Enter API key",
-      apiKeyOptionalPlaceholder: "Optional (e.g. leave blank for local Ollama)",
-      apiKeySavedPlaceholder: "Saved (enter a new key to replace)",
-      saveKey: "Save Key",
       deleteKey: "Delete Key",
       refreshModels: "Refresh Models",
       cancel: "Cancel",
@@ -103,6 +103,21 @@
       toastOriginalOn: "Showing original text.",
       toastOriginalOff: "Showing translated text.",
       toastEnableFirst: site => `Translation is off on ${site}.`,
+      privacySettings: "Privacy controls",
+      blockSite: site => `Always block this site (${site})`,
+      allowPaths: "Allow only these paths",
+      blockPaths: "Block these paths",
+      pathHint: "Enter one path per line, such as /docs or /members. Rules include subpaths. Leave the allow list empty to cover the site.",
+      persistCache: "Use persistent translation cache (24 hours)",
+      clearCache: "Clear all translation caches",
+      cacheCleared: "Translation caches cleared.",
+      cacheClearFailed: "Could not finish deleting the translation cache.",
+      invalidPaths: "Use valid paths beginning with /, one per line (up to 100 per list).",
+      privacyChanged: "Privacy settings changed in another tab. Reopen settings to edit them.",
+      privacyBlocked: "Privacy protection blocks translation on this page.",
+      setKey: "Set API Key…",
+      keyPrompt: endpoint => `Enter the API key for ${endpoint}. The browser prompt displays what you type.`,
+      transportUnavailable: "Update Tampermonkey to send requests with redirect protection.",
     },
     ko: {
       menuToggleSite: (site, on) => `${site} 자동 번역 ${on ? "끄기" : "켜기"}`,
@@ -120,11 +135,6 @@
       customModelPlaceholder: "예: meta-llama/llama-3.3-70b-instruct:free",
       speed: "응답 속도",
       effort: "추론 강도",
-      apiKey: "API 키",
-      apiKeyPlaceholder: "API 키 입력",
-      apiKeyOptionalPlaceholder: "선택 사항 (로컬 Ollama 등은 비워두기)",
-      apiKeySavedPlaceholder: "저장됨 (새 키를 입력해 변경)",
-      saveKey: "키 저장",
       deleteKey: "키 삭제",
       refreshModels: "모델 목록 새로고침",
       cancel: "취소",
@@ -167,6 +177,21 @@
       toastOriginalOn: "원문 표시 중",
       toastOriginalOff: "번역문 표시 중",
       toastEnableFirst: site => `${site}에서 번역이 꺼져 있습니다.`,
+      privacySettings: "개인정보 보호 설정",
+      blockSite: site => `이 사이트(${site}) 항상 차단`,
+      allowPaths: "다음 경로만 허용",
+      blockPaths: "다음 경로 차단",
+      pathHint: "/docs 또는 /members처럼 한 줄에 경로 하나를 입력하세요. 하위 경로에도 적용되며, 허용 목록이 비어 있으면 사이트 전체가 대상입니다.",
+      persistCache: "번역 캐시를 영구 저장 (24시간)",
+      clearCache: "전체 번역 캐시 삭제",
+      cacheCleared: "번역 캐시를 삭제했습니다.",
+      cacheClearFailed: "번역 캐시를 모두 삭제하지 못했습니다.",
+      invalidPaths: "/로 시작하는 올바른 경로를 한 줄에 하나씩 입력하세요. 목록마다 최대 100개입니다.",
+      privacyChanged: "다른 탭에서 개인정보 보호 설정이 변경되었습니다. 설정을 다시 열어 변경하세요.",
+      privacyBlocked: "개인정보 보호 규칙에 따라 이 페이지의 번역이 차단됩니다.",
+      setKey: "API 키 설정…",
+      keyPrompt: endpoint => `${endpoint}의 API 키를 입력하세요. 브라우저 창에 입력한 키가 표시됩니다.`,
+      transportUnavailable: "리디렉션 차단 기능을 사용하려면 Tampermonkey를 업데이트하세요.",
     },
     ja: {
       menuToggleSite: (site, on) => `${site} の自動翻訳を${on ? "オフ" : "オン"}`,
@@ -184,11 +209,6 @@
       customModelPlaceholder: "例: meta-llama/llama-3.3-70b-instruct:free",
       speed: "応答速度",
       effort: "推論強度",
-      apiKey: "APIキー",
-      apiKeyPlaceholder: "APIキーを入力",
-      apiKeyOptionalPlaceholder: "任意（ローカルOllama等は空欄可）",
-      apiKeySavedPlaceholder: "保存済み（新しいキーを入力して変更）",
-      saveKey: "キーを保存",
       deleteKey: "キーを削除",
       refreshModels: "モデル一覧を更新",
       cancel: "キャンセル",
@@ -231,6 +251,21 @@
       toastOriginalOn: "原文を表示中",
       toastOriginalOff: "翻訳を表示中",
       toastEnableFirst: site => `${site} の翻訳はオフです。`,
+      privacySettings: "プライバシー設定",
+      blockSite: site => `このサイト (${site}) を常にブロック`,
+      allowPaths: "以下のパスのみ許可",
+      blockPaths: "以下のパスをブロック",
+      pathHint: "/docs や /members などを1行に1つ入力してください。配下のパスにも適用されます。許可リストが空の場合はサイト全体が対象です。",
+      persistCache: "翻訳キャッシュを永続化する（24時間）",
+      clearCache: "翻訳キャッシュをすべて削除",
+      cacheCleared: "翻訳キャッシュを削除しました。",
+      cacheClearFailed: "翻訳キャッシュをすべて削除できませんでした。",
+      invalidPaths: "/ で始まる有効なパスを1行に1つ入力してください。各リストは最大100件です。",
+      privacyChanged: "別のタブでプライバシー設定が変更されました。設定を開き直してください。",
+      privacyBlocked: "プライバシー保護によりこのページの翻訳はブロックされています。",
+      setKey: "APIキーを設定…",
+      keyPrompt: endpoint => `${endpoint} のAPIキーを入力してください。入力内容はブラウザーのダイアログに表示されます。`,
+      transportUnavailable: "リダイレクトをブロックしてリクエストを送るには、Tampermonkeyを更新してください。",
     },
     "zh-Hans": {
       menuToggleSite: (site, on) => `${on ? "关闭" : "开启"} ${site} 自动翻译`,
@@ -248,11 +283,6 @@
       customModelPlaceholder: "例如：meta-llama/llama-3.3-70b-instruct:free",
       speed: "响应速度",
       effort: "推理强度",
-      apiKey: "API 密钥",
-      apiKeyPlaceholder: "输入 API 密钥",
-      apiKeyOptionalPlaceholder: "可选（本地 Ollama 等可留空）",
-      apiKeySavedPlaceholder: "已保存（输入新密钥可替换）",
-      saveKey: "保存密钥",
       deleteKey: "删除密钥",
       refreshModels: "刷新模型列表",
       cancel: "取消",
@@ -295,6 +325,21 @@
       toastOriginalOn: "当前显示原文",
       toastOriginalOff: "当前显示译文",
       toastEnableFirst: site => `${site} 未开启翻译。`,
+      privacySettings: "隐私设置",
+      blockSite: site => `始终阻止此网站 (${site})`,
+      allowPaths: "仅允许以下路径",
+      blockPaths: "阻止以下路径",
+      pathHint: "每行输入一个路径，例如 /docs 或 /members。规则也适用于子路径。允许列表为空时覆盖整个网站。",
+      persistCache: "使用持久翻译缓存（24 小时）",
+      clearCache: "清除全部翻译缓存",
+      cacheCleared: "已清除翻译缓存。",
+      cacheClearFailed: "无法清除全部翻译缓存。",
+      invalidPaths: "请每行输入一个以 / 开头的有效路径，每个列表最多 100 条。",
+      privacyChanged: "其他标签页已更改隐私设置。请重新打开设置后编辑。",
+      privacyBlocked: "隐私保护规则已阻止翻译此页面。",
+      setKey: "设置 API 密钥…",
+      keyPrompt: endpoint => `请输入 ${endpoint} 的 API 密钥。浏览器对话框会显示输入的内容。`,
+      transportUnavailable: "请更新 Tampermonkey，以便发送阻止重定向的请求。",
     },
     "zh-Hant": {
       menuToggleSite: (site, on) => `${on ? "關閉" : "開啟"} ${site} 自動翻譯`,
@@ -312,11 +357,6 @@
       customModelPlaceholder: "例如：meta-llama/llama-3.3-70b-instruct:free",
       speed: "回應速度",
       effort: "推理強度",
-      apiKey: "API 金鑰",
-      apiKeyPlaceholder: "輸入 API 金鑰",
-      apiKeyOptionalPlaceholder: "選填（本機 Ollama 等可留空）",
-      apiKeySavedPlaceholder: "已儲存（輸入新金鑰可替換）",
-      saveKey: "儲存金鑰",
       deleteKey: "刪除金鑰",
       refreshModels: "重新整理模型清單",
       cancel: "取消",
@@ -359,6 +399,21 @@
       toastOriginalOn: "目前顯示原文",
       toastOriginalOff: "目前顯示譯文",
       toastEnableFirst: site => `${site} 未開啟翻譯。`,
+      privacySettings: "隱私設定",
+      blockSite: site => `一律封鎖此網站 (${site})`,
+      allowPaths: "僅允許以下路徑",
+      blockPaths: "封鎖以下路徑",
+      pathHint: "每行輸入一個路徑，例如 /docs 或 /members。規則也適用於子路徑。允許清單為空時涵蓋整個網站。",
+      persistCache: "使用持久翻譯快取（24 小時）",
+      clearCache: "清除所有翻譯快取",
+      cacheCleared: "已清除翻譯快取。",
+      cacheClearFailed: "無法清除所有翻譯快取。",
+      invalidPaths: "請每行輸入一個以 / 開頭的有效路徑，每個清單最多 100 條。",
+      privacyChanged: "其他分頁已變更隱私設定。請重新開啟設定後編輯。",
+      privacyBlocked: "隱私保護規則已封鎖此頁面的翻譯。",
+      setKey: "設定 API 金鑰…",
+      keyPrompt: endpoint => `請輸入 ${endpoint} 的 API 金鑰。瀏覽器的對話框會顯示輸入的內容。`,
+      transportUnavailable: "請更新 Tampermonkey，以便傳送阻止重新導向的請求。",
     },
   };
 
@@ -409,6 +464,7 @@
 
   const SETTINGS = "settings";
   const ENABLED_SITES = "enabled-sites";
+  const CACHE_POLICY = "translation-cache-policy";
   const EFFORT = ["low", "medium", "high"];
   const GPT_5_EFFORT = ["none", ...EFFORT, "xhigh"];
   const GPT_EXTENDED_EFFORT = [...EFFORT, "xhigh", "max"];
@@ -570,19 +626,60 @@
     "[role='heading']", "[role='listitem']", "[role='cell']", "[role='columnheader']", "[role='rowheader']",
   ].join(",");
   const GENERIC_EXCLUDED = [
-    "nav", "footer", "aside", "dialog", "[role='dialog']", "[role='alertdialog']",
+    "nav", "footer", "aside",
     "[role='navigation']", "[role='banner']",
     "[role='contentinfo']", "[role='complementary']", "[role='menu']",
     "[role='menubar']", "[role='toolbar']",
   ].join(",");
 
+  const SENSITIVE_SEGMENT = /^(?:accounts?|account-settings|my-?account|user-settings|preferences|settings|password|password-reset|reset-password|forgot-password|login|log-in|signin|sign-in|logout|sign-out|signup|sign-up|register|auth|authenticate|authentication|oauth2?|sso|mfa|2fa|verify|verification|inbox|mail|webmail|chats?|messenger|messages?|messaging|dms?|direct-messages?|private-messages?|modmail|billing|payments?|checkout|checkoutnow|cart|orders?|purchases?|wallet|subscriptions|nsfw|over18|adult-content)$/i;
+  const SENSITIVE_HOST = /^(?:accounts?|auth|billing|chat|checkout|inbox|login|mail|messages?|messenger|pay|payments|secure|signin|sso|webmail)\./i;
+  const PRIVATE_APP_HOST = /^(?:app\.slack\.com|web\.whatsapp\.com|messages\.google\.com|outlook\.(?:live|office|office365)\.com|teams\.microsoft\.com)$/;
+  const PRIVATE_REGION = [
+    "dialog", "[role='dialog']", "[role='alertdialog']", "[role='log']",
+    "[data-private]:not([data-private='false' i]):not([data-private='0'])",
+    "[data-sensitive]:not([data-sensitive='false' i]):not([data-sensitive='0'])",
+    "[data-visibility='private' i]",
+    "[data-testid='chat-container']", "[data-testid='message-list']", "[data-testid='inbox']",
+    "#chat-messages", "#message-list", "#private-messages", "#inbox", "#checkout",
+    "reddit-chat", "shreddit-chat", "shreddit-chat-drawer", "shreddit-message", "shreddit-inbox",
+  ].join(",");
+  const PRIVATE_INPUT = [
+    "input[type='password' i]", "input[autocomplete~='one-time-code' i]",
+    "input[autocomplete*='cc-' i]", "input[autocomplete~='current-password' i]",
+    "input[autocomplete~='new-password' i]",
+  ].join(",");
+  const OLD_REDDIT_POST = ".thing.link, .thing[data-fullname^='t3_']";
+  const REDDIT_POST = `shreddit-post,${OLD_REDDIT_POST},.Post,[data-testid='post-container'],.search-result-link,search-telemetry-tracker`;
+  const REDDIT_COMMENT = "shreddit-comment,.thing.comment,[data-testid='comment']";
+  const ADULT_ATTRIBUTES = ["nsfw", "over18", "over-18", "over_18", "is-nsfw", "is-nsfw-post",
+    "data-nsfw", "data-over18", "data-over-18", "data-over_18", "data-is-nsfw"];
+  const ADULT_MARKER = [
+    ...ADULT_ATTRIBUTES.map(name => `[${name}]:not([${name}='false' i]):not([${name}='0'])`),
+    ".over18", ".nsfw", ".nsfw-stamp", ".nsfw-tag", "shreddit-nsfw-badge",
+    "[data-testid='nsfw-indicator']", "[data-testid='nsfw-tag']", "[aria-label='NSFW' i]",
+    "[title='NSFW' i]", "[aria-label='18+' i]",
+  ].join(",");
+  const PAGE_ADULT_MARKER = [
+    "meta:is([name='rating' i],[property='og:rating' i]):is([content='adult' i],[content='restricted' i],[content='mature' i],[content='nsfw' i],[content='rta-5042-1996-1400-1577-rta' i])",
+    "shreddit-nsfw-blocking-modal", "shreddit-nsfw-interstitial", "shreddit-quarantine-modal",
+    ...["shreddit-subreddit-header", "shreddit-subreddit-header-banner", "shreddit-subreddit-meta",
+      "#sr-header-area", ".side .titlebox"].map(tag => `${tag}:is(${ADULT_MARKER}),${tag} :is(${ADULT_MARKER})`),
+  ].join(",");
+  const PRIVATE_PAGE = "meta[name='octolytics-dimension-repository_public'][content='false']";
+  // Local snapshot of 4chan's public worksafe categories. Unknown boards stay blocked.
+  const CHAN_WORKSAFE = new Set(("3 a adv an biz c cgl ck co diy f fa fit g gd his i ic int jp k lit m mlp mu n news o out p " +
+    "po pw qst sci sp tg toy trv tv v vg vm vmg vp vr vrpg vst vt w wg wsg wsr x xs").split(" "));
+  const VISIBLE_SECRET = /\b(?:authorization\s*:\s*)?(?:bearer|basic)\s+[a-z0-9+/_=.-]{16,}|\b(?:api[ _-]*key|access[ _-]*token|client[ _-]*secret|password|passcode)\s*[:=]\s*[^\s]{6,}|\b(?:sk-(?:proj-|ant-)?[a-z0-9_-]{16,}|AIza[a-z0-9_-]{30,}|eyJ[a-z0-9_-]{10,}\.[a-z0-9_-]{10,}\.[a-z0-9_-]{10,})|-----BEGIN [A-Z ]*PRIVATE KEY-----|[?#&](?:access_token|id_token|refresh_token|token|api_key|password|client_secret)=[^\s&#]+/i;
   const MUTATION_OPTIONS = {
     subtree: true, childList: true, characterData: true, attributes: true,
-    attributeFilter: ["hidden", "aria-hidden", "class", "style", "open", "revealed"],
+    attributeFilter: ["hidden", "aria-hidden", "class", "style", "open", "revealed", "type", "autocomplete",
+      "content", "name", "property", "role", "data-private", "data-sensitive", "data-visibility", "data-testid", "aria-label",
+      "title", "id", "post-id", "thingid", "data-fullname", ...ADULT_ATTRIBUTES],
   };
   const CHAN_BOARD_FORM = "form#delform[name='delform']";
   const CHAN_POST_CONTEXT = ".post, .inline, #qp";
-  const CHAN_EXCLUDED = "a.backlink, a.hashlink, .stub, .prettyprint, .sjis";
+  const CHAN_EXCLUDED = "a.backlink, a.hashlink, .stub, .prettyprint, .sjis, .inline, #qp";
   const EXCLUDED = [
     "script", "style", "noscript", "iframe", "svg", "math", "label", "input", "select",
     "textarea", "[contenteditable]:not([contenteditable='false'])", "[translate='no']", ".notranslate",
@@ -595,13 +692,14 @@
   const CHARS_PER_BATCH = 2800;
   const PARTS_PER_BATCH = 24;
   const CACHE_LIMIT = 450;
-  const TRANSLATION_CACHE_PREFIX = "translation:v1:";
-  const TRANSLATION_CACHE_KEY = /^translation:v1:[a-f0-9]{64}$/;
+  const TRANSLATION_CACHE_PREFIX = "translation:v2:";
+  const TRANSLATION_CACHE_KEY = /^translation:v[12]:[a-f0-9]{64}$/;
   const TRANSLATION_CACHE_TTL = 24 * 60 * 60 * 1000;
   const STORED_TRANSLATION_LIMIT = 5000;
   const STORED_TRANSLATION_CHAR_LIMIT = 1_500_000;
   const CACHE_PRUNE_INTERVAL = 10 * 60 * 1000;
   const RESCAN_DELAY = 150;
+  const ROUTE_CHECK_DELAY = 1000;
   const MAX_ENABLED_SITES = 500;
 
   function validModelId(value) {
@@ -658,6 +756,27 @@
       }
     }
     return Array.from(seen);
+  }
+
+  function normalizePath(raw) {
+    if (typeof raw !== "string" || !raw.startsWith("/") || /%(?:2f|5c)/i.test(raw)) return null;
+    try {
+      const path = decodeURIComponent(raw).normalize("NFC");
+      if (/[\\;?#%\x00-\x1f\x7f]/.test(path) || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) return null;
+      return path.replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
+    } catch {
+      return null;
+    }
+  }
+
+  function normalizeRules(raw) {
+    if (!Array.isArray(raw) || raw.length > 100) return null;
+    const paths = raw.map(value => typeof value === "string" && value.length <= 1024 ? normalizePath(value) : null);
+    return paths.includes(null) ? null : Array.from(new Set(paths));
+  }
+
+  function matchesPath(path, prefix) {
+    return prefix === "/" || prefix === path || path.startsWith(prefix + "/");
   }
 
   function normalizeSettings(raw = {}) {
@@ -841,7 +960,14 @@
       !/[\u0000-\u0008\u000e-\u001f]/u.test(text);
   }
 
-  function requestJson({ method, url, headers, body, timeout }) {
+  function transportSupported() {
+    const version = /^(\d+)\.(\d+)/.exec(GM_info.version ?? "");
+    // The redirect option needs Tampermonkey build 6180 or later.
+    return GM_info.scriptHandler === "Tampermonkey" && Boolean(version) &&
+      (Number(version[1]) > 5 || (Number(version[1]) === 5 && Number(version[2]) >= 2));
+  }
+
+  function requestJson({ method, url, headers, body, timeout, permit }) {
     let request;
     const result = new Promise((resolve, reject) => {
       const fail = (status, retryAfter = 0) => {
@@ -851,12 +977,17 @@
       // Some userscript managers ignore the request timeout in fetch mode.
       const deadline = setTimeout(() => {
         fail("timeout");
-        request?.abort();
+        request?.abort?.();
       }, timeout);
       try {
+        const data = body === undefined ? undefined : JSON.stringify(body);
+        if (!transportSupported() || (permit && !permit())) {
+          fail("aborted");
+          return;
+        }
         request = GM_xmlhttpRequest({
           method, url, headers, timeout, anonymous: true, redirect: "error",
-          ...(body === undefined ? {} : { data: JSON.stringify(body) }),
+          ...(data === undefined ? {} : { data }),
           onabort: () => fail("aborted"),
           onerror: () => fail("network"),
           ontimeout: () => fail("timeout"),
@@ -882,10 +1013,10 @@
         fail("network");
       }
     });
-    return { result, abort: () => request?.abort() };
+    return { result, abort: () => request?.abort?.() };
   }
 
-  function sendTranslation(config, apiKey, groups) {
+  function sendTranslation(config, apiKey, groups, permit) {
     let spec;
     try {
       spec = translationRequest(config, apiKey, groups);
@@ -895,6 +1026,7 @@
     const request = requestJson({
       method: "POST",
       ...spec,
+      permit,
       timeout: 50000,
     });
     const result = request.result.then(data => {
@@ -1081,33 +1213,43 @@
 
   const keyName = provider => `api-key:${provider}`;
 
+  function validApiKey(provider, value) {
+    return typeof value === "string" && value.length >= (provider === "custom" ? 1 : 8) &&
+      /^[\x21-\x7e]{1,512}$/.test(value);
+  }
+
   function readApiKey(provider, baseUrl) {
     const stored = GM_getValue(keyName(provider));
-    if (provider === "custom") {
-      return baseUrl && stored?.baseUrl === baseUrl && typeof stored.value === "string" ? stored.value : "";
-    }
-    return typeof stored === "string" ? stored : "";
+    const value = provider === "custom" ? (baseUrl && stored?.baseUrl === baseUrl ? stored.value : "") : stored;
+    return validApiKey(provider, value) ? value : "";
   }
 
   function writeApiKey(provider, baseUrl, value) {
     GM_setValue(keyName(provider), provider === "custom" ? { baseUrl, value } : value);
   }
 
-  const isMobileReddit = location.hostname === "m.reddit.com";
-  const isReddit = isMobileReddit || /^(?:(?:www|old)\.)?reddit\.com$/.test(location.hostname);
-  const is4chan = /^boards\.4chan(?:nel)?\.org$/.test(location.hostname);
+  const canonicalHost = location.hostname.replace(/\.$/, "");
+  const isMobileReddit = canonicalHost === "m.reddit.com";
+  const legacyReddit = /^(?:(?:www|old)\.)?reddit\.com$/.test(location.hostname);
+  const isReddit = legacyReddit || /^(?:(?:www|old|new|np|sh|m)\.)?reddit\.com$/.test(canonicalHost);
+  const legacyBoards = /^boards\.4chan(?:nel)?\.org$/.test(location.hostname);
+  const is4chan = /^boards\.4chan(?:nel)?\.org$/.test(canonicalHost);
   const isMobileBilibili = location.hostname === "m.bilibili.com";
   const isBilibili = isMobileBilibili || /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
   const isLinuxDo = /^(?:www\.)?linux\.do$/.test(location.hostname);
   const isGeneric = !isReddit && !is4chan && !isBilibili && !isLinuxDo;
   // Keep opt-in for each mobile subdomain explicit, including existing preferences.
   const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
-    : isReddit ? "reddit.com"
-    : is4chan ? "4chan.org"
+    : legacyReddit ? "reddit.com"
+    : legacyBoards ? "4chan.org"
     : isBilibili ? "bilibili.com"
     : location.hostname.toLowerCase().replace(/^www\./, "");
   // Keep the existing board opt-in separate from the generic landing page.
   const SITE_KEY = isGeneric && CURRENT_SITE === "4chan.org" ? "host:4chan.org" : CURRENT_SITE;
+  const LEGACY_SCOPE = location.protocol === "https:" && !location.port;
+  const SITE_POLICY = `site-policy:${LEGACY_SCOPE ? SITE_KEY : location.origin}`;
+  const SITE_BLOCK = `site-block:${SITE_KEY.replace(/\.$/, "")}`;
+  const SITE_LABEL = LEGACY_SCOPE ? CURRENT_SITE : location.origin;
   const isMobileSite = isMobileReddit || isMobileBilibili;
   const selector = isMobileBilibili ? `${BILI_MOBILE_TARGETS},${TEXT_BLOCK}`
     : isMobileReddit ? `${REDDIT_TARGETS},${TEXT_BLOCK}`
@@ -1124,16 +1266,21 @@
   const cache = new Map();
   let cachePruneAt = 0;
   let storedWrites = 0;
+  let cachePolicy = readCachePolicy();
   let states = new WeakMap();
   let settings = normalizeSettings(GM_getValue(SETTINGS));
-  let enabledSites = normalizeEnabledSites(GM_getValue(ENABLED_SITES));
   let uiLocale = resolveUiLocale(settings.uiLanguage);
   let ui = UI_STRINGS[uiLocale];
   let key = readApiKey(settings.provider, settings.customBaseUrl);
   let route = currentRoute();
+  let routeProtected = false;
+  let quarantineOnResume = false;
+  const previousPageText = new WeakSet();
   let observer;
   let mutations;
   let timer;
+  let routeTimer;
+  let pageSuspended = false;
   let active;
   let dialog;
   let showingOriginal = false;
@@ -1147,8 +1294,22 @@
   let menuCommandIds = [];
   let menusRegistered = false;
 
-  function isSiteEnabled() {
-    return enabledSites.includes(SITE_KEY);
+  function readSitePolicy() {
+    try {
+      const block = GM_getValue(SITE_BLOCK);
+      const siteBlocked = block !== undefined && block !== false;
+      const saved = GM_getValue(SITE_POLICY);
+      if (saved === undefined) {
+        const enabled = LEGACY_SCOPE && normalizeEnabledSites(GM_getValue(ENABLED_SITES)).includes(SITE_KEY);
+        return { enabled, allow: [], deny: [], siteBlocked };
+      }
+      const allow = normalizeRules(saved?.allow);
+      const deny = normalizeRules(saved?.deny);
+      if (allow && deny && typeof saved.enabled === "boolean") return { enabled: saved.enabled, allow, deny, siteBlocked };
+    } catch {
+      // An unreadable rule cannot grant consent.
+    }
+    return { enabled: false, allow: [], deny: ["/"], siteBlocked: true };
   }
 
   function providerReady(config = settings, apiKey = key) {
@@ -1158,17 +1319,17 @@
   }
 
   function currentRoute() {
+    let path = location.pathname;
     if (isLinuxDo) {
       // Discourse updates the reply number in the URL as the reader scrolls.
-      return location.pathname.replace(/^(\/t\/[^/]+\/\d+)\/\d+\/?$/, "$1") + location.search;
+      path = path.replace(/^(\/t\/[^/]+\/\d+)\/\d+\/?$/, "$1");
     }
-    return isBilibili || isGeneric ? location.pathname + location.search : location.pathname;
+    return path + location.search + location.hash;
   }
 
-  function browsePage() {
-    if (isMobileSite) return true;
-    const path = location.pathname;
+  function browsePage(path) {
     if (isBilibili) {
+      if (isMobileBilibili) return true;
       const page = path.replace(/^\/(?:zh-Hans|zh-Hant|en|ja|ko)(?=\/|$)/, "") || "/";
       if (location.hostname === "search.bilibili.com") return /^\/(?:$|(?:all|video)(?:\/|$))/.test(page);
       return /^\/(?:$|(?:video|opus|v\/popular)(?:\/|$))/.test(page);
@@ -1177,6 +1338,70 @@
       return /^\/(?:$|(?:r|u|user|comments|search|popular|all|best|hot|new|rising|top|controversial)(?:\/|$))/.test(path);
     }
     return true;
+  }
+
+  function sensitivePath(path) {
+    return path.split("/").some(segment => SENSITIVE_SEGMENT.test(segment));
+  }
+
+  function sensitiveQuery(query) {
+    const params = new URLSearchParams(query);
+    for (const [key, value] of params) {
+      if (/^(?:access_token|id_token|refresh_token|token|api_key|password|client_secret|reset_token|session_token|sso|SAMLResponse)$/i.test(key)) return true;
+      if (/^(?:nsfw|over18|over_18|adult)$/i.test(key) && !/^(?:false|0|off|no)$/i.test(value)) return true;
+      if (/^(?:page|section|view|tab|route|screen|action|mode)$/i.test(key)) {
+        const path = normalizePath(value.startsWith("/") ? value : `/${value}`);
+        if (path === null || sensitivePath(path)) return true;
+      }
+      if (/^code$/i.test(key) && params.has("state")) return true;
+    }
+    return false;
+  }
+
+  function routeAllowed(policy) {
+    if (policy.siteBlocked || SENSITIVE_HOST.test(canonicalHost) || PRIVATE_APP_HOST.test(canonicalHost) ||
+      /^(?:dis|p|sys)\.4chan(?:nel)?\.org$/.test(canonicalHost)) return false;
+    const path = normalizePath(location.pathname);
+    if (path === null || sensitivePath(path) || !browsePage(path) || sensitiveQuery(location.search)) return false;
+    if (/^(?:(?:www|ptb|canary)\.)?discord(?:app)?\.com$/.test(canonicalHost) && /^\/channels(?:\/|$)/i.test(path)) return false;
+    const [fragment, query] = location.hash.slice(1).replace(/^!/, "").split(/\?(.*)/s, 2);
+    const hashPath = fragment.startsWith("/") ? normalizePath(fragment) : null;
+    let decodedFragment;
+    try { decodedFragment = decodeURIComponent(fragment); } catch { return false; }
+    if ((fragment.startsWith("/") && hashPath === null) || sensitiveQuery(query ?? fragment) ||
+      sensitivePath(decodedFragment) || (decodedFragment.startsWith("/") && !hashPath)) return false;
+    if (is4chan && !CHAN_WORKSAFE.has(path.split("/")[1])) return false;
+    if (isLinuxDo && !LINUX_DO_FORUM_PATH.test(path)) return false;
+    const denied = candidate => policy.deny.some(prefix => matchesPath(candidate.toLowerCase(), prefix.toLowerCase()));
+    return !denied(path) && (!hashPath || !denied(hashPath)) &&
+      (!policy.allow.length || policy.allow.some(prefix => matchesPath(hashPath ?? path, prefix)));
+  }
+
+  function adultMarked(element) {
+    return element.matches(ADULT_MARKER) || Boolean(element.querySelector(ADULT_MARKER) ||
+      element.shadowRoot?.querySelector(ADULT_MARKER));
+  }
+
+  function redditThreadAllowed(path) {
+    const thread = /^\/(?:r\/[^/]+\/)?comments\/([a-z0-9]+)(?:\/|$)/i.exec(path);
+    if (!thread) return !/^\/(?:r\/[^/]+\/)?(?:comments|s)(?:\/|$)/i.test(path);
+    const id = `t3_${thread[1].toLowerCase()}`;
+    const posts = document.querySelectorAll(`shreddit-post:is([id='${id}'],[post-id='${id}'],[thingid='${id}']),` +
+      `.thing:is([data-fullname='${id}'],[id='thing_${id}'])`);
+    // Comments on a permalink need the matching post and cannot inherit an unrelated post's metadata.
+    return posts.length > 0 && !Array.from(posts).some(adultMarked);
+  }
+
+  function documentAllowed() {
+    const path = normalizePath(location.pathname);
+    if (!path || !document.body || document.documentElement.matches(ADULT_MARKER) ||
+      document.body.matches(ADULT_MARKER) || document.querySelector(`${PRIVATE_PAGE},${PAGE_ADULT_MARKER}`)) return false;
+    for (const input of document.querySelectorAll(PRIVATE_INPUT)) {
+      if (input.getClientRects().length && !input.closest("[hidden], [aria-hidden='true'], [inert]") &&
+        input.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false) return false;
+    }
+    if (isLinuxDo && LINUX_DO_TOPIC_PATH.test(path) && !document.body.classList.contains("archetype-regular")) return false;
+    return !isReddit || redditThreadAllowed(path);
   }
 
   function showToast(message, isError = false) {
@@ -1233,7 +1458,10 @@
       const id = GM_registerMenuCommand(label, handler);
       if (id !== undefined) menuCommandIds.push(id);
     };
-    add(ui.menuToggleSite(CURRENT_SITE, isSiteEnabled()) + (touchInput.matches ? "" : " (Alt+Shift+T)"), toggleCurrentSite);
+    const policy = readSitePolicy();
+    const enabled = policy.enabled && !policy.siteBlocked;
+    add(ui.menuToggleSite(SITE_LABEL, enabled) + (touchInput.matches ? "" : " (Alt+Shift+T)"),
+      enabled ? disableCurrentSite : enableCurrentSite);
     add(ui.menuToggleOriginal(showingOriginal) + (touchInput.matches ? "" : " (Alt+T)"), toggleOriginalView);
     add(ui.menuSettings, openSettings);
     menusRegistered = true;
@@ -1259,20 +1487,36 @@
   }
 
   function setSiteEnabled(enable) {
-    const current = normalizeEnabledSites(GM_getValue(ENABLED_SITES));
-    const set = new Set(current);
-    if (set.has(SITE_KEY) !== enable) {
-      if (enable) set.add(SITE_KEY);
-      else set.delete(SITE_KEY);
-      GM_setValue(ENABLED_SITES, Array.from(set).slice(-MAX_ENABLED_SITES));
+    const { enabled, allow, deny, siteBlocked } = readSitePolicy();
+    if (enable && (siteBlocked || !routeAllowed({ allow, deny, siteBlocked }) || !documentAllowed())) return false;
+    if (enabled !== enable) {
+      if (!enable) stopTranslation();
+      GM_setValue(SITE_POLICY, { enabled: enable, allow, deny });
     }
-    updateSettings();
+    refreshPage();
+    registerMenus();
+    return true;
   }
 
   function toggleCurrentSite() {
-    if (isSiteEnabled()) {
-      setSiteEnabled(false);
-      showToast(ui.toastSiteDisabled(CURRENT_SITE));
+    const policy = readSitePolicy();
+    if (policy.enabled && !policy.siteBlocked) disableCurrentSite();
+    else enableCurrentSite();
+  }
+
+  function disableCurrentSite() {
+    setSiteEnabled(false);
+    showToast(ui.toastSiteDisabled(SITE_LABEL));
+  }
+
+  function enableCurrentSite() {
+    const policy = readSitePolicy();
+    if (!routeAllowed(policy) || !documentAllowed()) {
+      showToast(ui.privacyBlocked, true);
+      return;
+    }
+    if (!transportSupported()) {
+      showToast(ui.transportUnavailable, true);
       return;
     }
     if (!providerReady()) {
@@ -1280,13 +1524,17 @@
       openSettings();
       return;
     }
-    setSiteEnabled(true);
-    showToast(ui.toastSiteEnabled(CURRENT_SITE));
+    if (setSiteEnabled(true)) showToast(ui.toastSiteEnabled(SITE_LABEL));
   }
 
   function toggleOriginalView() {
-    if (!isSiteEnabled()) {
-      showToast(ui.toastEnableFirst(CURRENT_SITE));
+    const policy = readSitePolicy();
+    if (!policy.enabled) {
+      showToast(ui.toastEnableFirst(SITE_LABEL));
+      return;
+    }
+    if (!routeAllowed(policy) || !documentAllowed()) {
+      showToast(ui.privacyBlocked, true);
       return;
     }
     if (!providerReady()) {
@@ -1294,29 +1542,33 @@
       return;
     }
     showingOriginal = !showingOriginal;
-    if (showingOriginal) {
-      abortActive();
-      clearTimeout(timer);
-      timer = undefined;
-      for (const [node, state] of modified) {
-        if (node.isConnected && node.data === state.rendered) node.data = state.original;
-      }
-      showToast(ui.toastOriginalOn);
-    } else {
-      for (const [node, state] of modified) {
-        if (node.isConnected && node.data === state.original) node.data = state.rendered;
-      }
-      showToast(ui.toastOriginalOff);
-      schedule(0);
-    }
+    if (showingOriginal) stopTranslation(false);
+    refreshPage();
+    showToast(showingOriginal ? ui.toastOriginalOn : ui.toastOriginalOff);
     registerMenus();
+  }
+
+  function readCachePolicy() {
+    try {
+      const saved = GM_getValue(CACHE_POLICY);
+      if (typeof saved?.generation === "string" && /^[a-f0-9]{32}$/.test(saved.generation)) {
+        return { persistent: saved.persistent === true, generation: saved.generation };
+      }
+    } catch {}
+    return { persistent: false, generation: "" };
+  }
+
+  function canUseDiskCache() {
+    const live = readCachePolicy();
+    return live.persistent && live.generation === cachePolicy.generation && Boolean(window.crypto?.subtle);
   }
 
   async function translationCacheKey(config, originalNodeText, sourcePart) {
     try {
       const { language, provider, model, effort, customBaseUrl } = config;
       const scope = provider === "custom" ? `${provider}:${customBaseUrl}` : provider;
-      const input = JSON.stringify([language, scope, model, effort, originalNodeText.trim(), sourcePart]);
+      const input = JSON.stringify([cachePolicy.generation, SITE_POLICY, language, scope, model, effort,
+        originalNodeText.trim(), sourcePart]);
       const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
       const hex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
       return TRANSLATION_CACHE_PREFIX + hex;
@@ -1326,7 +1578,8 @@
   }
 
   function translationCacheEntry(entry, now, sourceLength = CHARS_PER_PART) {
-    if (!Number.isSafeInteger(entry?.savedAt) || entry.savedAt < 0 || entry.savedAt > now ||
+    if (entry?.generation !== cachePolicy.generation || !Number.isSafeInteger(entry?.savedAt) ||
+      entry.savedAt < 0 || entry.savedAt > now ||
       now - entry.savedAt >= TRANSLATION_CACHE_TTL || !validTranslatedPart(entry.text, sourceLength)) return null;
     return entry;
   }
@@ -1344,22 +1597,25 @@
     if (!part.cacheKey) return;
     try {
       if (readCachedPart(part, savedAt)) return;
-      GM_setValue(part.cacheKey, { text, savedAt });
+      GM_setValue(part.cacheKey, { text, savedAt, generation: cachePolicy.generation });
       storedWrites += 1;
     } catch {
       // The tab cache remains available if extension storage cannot be written.
     }
   }
 
-  function maintainTranslationCache(now = Date.now()) {
-    if (now < cachePruneAt && storedWrites < 100) return;
+  function maintainTranslationCache(now = Date.now(), force = false) {
+    if (!force && now < cachePruneAt && storedWrites < 100) return true;
+    const livePolicy = readCachePolicy();
+    // A delayed storage event must never let an old tab prune entries from the new generation.
+    if (livePolicy.generation !== cachePolicy.generation) return false;
     cachePruneAt = now + CACHE_PRUNE_INTERVAL;
     storedWrites = 0;
     try {
       const live = [];
       for (const name of GM_listValues()) {
         if (!TRANSLATION_CACHE_KEY.test(name)) continue;
-        const entry = translationCacheEntry(GM_getValue(name), now);
+        const entry = livePolicy.persistent ? translationCacheEntry(GM_getValue(name), now) : null;
         if (entry) live.push({ name, ...entry });
         else GM_deleteValue(name);
       }
@@ -1374,12 +1630,15 @@
           chars += text.length;
         }
       }
+      return true;
     } catch {
       // Lookup still rejects expired entries when the cleanup pass is unavailable.
+      return false;
     }
   }
 
   function cacheKeysReady(groups) {
+    if (!canUseDiskCache()) return true;
     const lookups = [];
     let waiting = false;
     for (const group of groups) {
@@ -1396,6 +1655,23 @@
     }
     if (lookups.length) Promise.all(lookups).then(() => schedule(0));
     return !waiting;
+  }
+
+  function updateCachePolicy() {
+    const next = readCachePolicy();
+    if (next.generation === cachePolicy.generation && next.persistent === cachePolicy.persistent) return;
+    stopTranslation();
+    cachePolicy = next;
+    cachePruneAt = 0;
+    refreshPage();
+  }
+
+  function resetCachePolicy(persistent) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const generation = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+    GM_setValue(CACHE_POLICY, { persistent, generation });
+    updateCachePolicy();
+    return maintainTranslationCache(Date.now(), true);
   }
 
   function schedule(delay = RESCAN_DELAY) {
@@ -1419,7 +1695,9 @@
     const root = host.shadowRoot;
     if (root) {
       if (commentRoots.has(root)) return;
-      const watcher = new MutationObserver(handleMutations);
+      const watcher = new MutationObserver(records => {
+        if (commentRoots.get(root) === watcher) handleMutations(records);
+      });
       commentRoots.set(root, watcher);
       watcher.observe(root, MUTATION_OPTIONS);
       root.addEventListener("scroll", scheduleScroll, { passive: true, capture: true });
@@ -1429,8 +1707,10 @@
     const tag = host.localName;
     if (watchedCommentTags.has(tag)) return;
     watchedCommentTags.add(tag);
+    const observing = observer;
     customElements.whenDefined(tag).then(() => {
-      if (!observer) return;
+      refreshPage();
+      if (observer !== observing) return;
       scan(document.documentElement);
       for (const tree of commentRoots.keys()) scan(tree);
       schedule();
@@ -1438,7 +1718,7 @@
   }
 
   function scan(node) {
-    if (!node.isConnected || !node.querySelectorAll || !browsePage()) return;
+    if (!node.isConnected || !node.querySelectorAll) return;
     const match = targetSelector(node);
     if (match) {
       const observe = element => {
@@ -1459,7 +1739,7 @@
   }
 
   function scanChanEvent(event) {
-    if (!observer) return;
+    if (!observer || !refreshPage()) return;
     const root = event.target === document ? document.documentElement : event.target;
     if (root?.nodeType !== Node.ELEMENT_NODE || !root.isConnected) return;
     scan(root);
@@ -1488,6 +1768,8 @@
   }
 
   function handleMutations(records) {
+    const observing = observer;
+    if (!observing || !refreshPage() || observer !== observing) return;
     let removed = false;
     let changed = false;
     for (const record of records) {
@@ -1503,25 +1785,28 @@
       record.addedNodes.forEach(scan);
       removed ||= record.removedNodes.length > 0;
       const match = targetSelector(record.target);
-      changed ||= record.type === "childList" ||
+      changed ||= record.type === "childList" || record.type === "attributes" ||
         (isBilibili && commentRoots.has(record.target.getRootNode())) ||
         Boolean(match && (record.target.closest?.(match) || record.target.querySelector?.(match)));
     }
     if (removed) prune();
+    if (changed && active && !active.partsAllowed()) abortActive();
     if (changed) schedule();
   }
 
   function begin() {
-    if (observer || !isSiteEnabled() || !providerReady()) return;
-    maintainTranslationCache();
-    observer = new IntersectionObserver(entries => {
+    const observing = new IntersectionObserver(entries => {
+      if (observer !== observing || !refreshPage() || observer !== observing) return;
       for (const { target, isIntersecting, intersectionRect } of entries) {
         if (isIntersecting && intersectionRect.width > 0 && intersectionRect.height > 0) visibleTargets.add(target);
         else visibleTargets.delete(target);
       }
       schedule();
     });
-    mutations = new MutationObserver(handleMutations);
+    observer = observing;
+    mutations = new MutationObserver(records => {
+      if (observer === observing) handleMutations(records);
+    });
     mutations.observe(document.documentElement, MUTATION_OPTIONS);
     scan(document.documentElement);
   }
@@ -1529,10 +1814,10 @@
   function abortActive() {
     const request = active;
     active = null;
-    request?.abort();
+    try { request?.abort(); } catch {}
   }
 
-  function updateSettings() {
+  function stopTranslation(clearMemory = true) {
     abortActive();
     clearTimeout(timer);
     timer = undefined;
@@ -1543,7 +1828,9 @@
       root.removeEventListener("scroll", scheduleScroll, true);
     }
     commentRoots.clear();
+    watchedCommentTags.clear();
     observer = null;
+    mutations = null;
     visibleTargets.clear();
     targets.clear();
     for (const [node, state] of modified) {
@@ -1551,10 +1838,12 @@
     }
     modified.clear();
     states = new WeakMap();
-    cache.clear();
+    if (clearMemory) cache.clear();
+  }
+
+  function updateSettings() {
+    stopTranslation();
     settings = normalizeSettings(GM_getValue(SETTINGS));
-    enabledSites = normalizeEnabledSites(GM_getValue(ENABLED_SITES));
-    if (!isSiteEnabled()) showingOriginal = false;
     uiLocale = resolveUiLocale(settings.uiLanguage);
     ui = UI_STRINGS[uiLocale];
     key = readApiKey(settings.provider, settings.customBaseUrl);
@@ -1562,21 +1851,60 @@
     blocked = false;
     lastStatus = "";
     registerMenus();
-    begin();
+    refreshPage();
   }
 
-  function refreshRoute() {
+  function translationAllowed(policy = readSitePolicy()) {
+    return policy.enabled && !pageSuspended && !showingOriginal && !dialog && !document.hidden &&
+      providerReady() && transportSupported() && currentRoute() === route && routeAllowed(policy) && documentAllowed();
+  }
+
+  function refreshPage() {
     const next = currentRoute();
-    if (route === next) return;
-    route = next;
-    abortActive();
-    if (observer) scan(document.documentElement);
+    if (route !== next) {
+      stopTranslation();
+      quarantineOnResume ||= routeProtected;
+      route = next;
+      cooldown = 0;
+      blocked = false;
+    }
+    const policy = readSitePolicy();
+    if (!policy.enabled || policy.siteBlocked) showingOriginal = false;
+    routeProtected = policy.enabled && (!routeAllowed(policy) || !documentAllowed());
+    const allowed = policy.enabled && !routeProtected && !pageSuspended && !showingOriginal &&
+      !dialog && !document.hidden && providerReady() && transportSupported();
+    if (allowed && !observer) {
+      if (quarantineOnResume) {
+        // SPA navigation can leave the previous protected view in the document after the URL changes.
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) previousPageText.add(node);
+        quarantineOnResume = false;
+      }
+      begin();
+    }
+    if (!allowed && (observer || active || timer !== undefined)) {
+      stopTranslation(!policy.enabled || policy.siteBlocked || !(showingOriginal || dialog || document.hidden));
+    }
+
+    // An opted-in page can recover after late metadata or a SPA move without attaching an observer to a blocked page.
+    if (policy.enabled && !policy.siteBlocked && !pageSuspended && !document.hidden && !showingOriginal && !dialog &&
+      providerReady() && transportSupported()) {
+      routeTimer ??= setTimeout(() => {
+        routeTimer = undefined;
+        if (cachePolicy.persistent) maintainTranslationCache();
+        refreshPage();
+      }, ROUTE_CHECK_DELAY);
+    } else {
+      clearTimeout(routeTimer);
+      routeTimer = undefined;
+    }
+    return allowed;
   }
 
   function textState(node) {
     let state = states.get(node);
     if (state?.rendered === node.data) return state;
-    if (node.data.length > 16000) return null;
+    if (node.data.length > 16000 || VISIBLE_SECRET.test(node.data)) return null;
     state = { original: node.data, rendered: node.data, parts: splitSource(node.data) };
     states.set(node, state);
     modified.delete(node);
@@ -1643,20 +1971,26 @@
       rect.left < right && rect.top < bottom);
   }
 
-  function excluded(element) {
+  function excluded(element, privacyCache = new WeakMap()) {
     const sidebarLabel = isLinuxDo ? element.closest(LINUX_DO_SIDEBAR_TARGETS) : null;
     const selectors = sidebarLabel?.matches(LINUX_DO_SIDEBAR_HEADING) ? EXCLUDED : EXCLUDED_WITH_BUTTONS;
     for (let ancestor = element; ancestor; ancestor = isBilibili ? ancestor.getRootNode().host : null) {
-      if (ancestor.closest(selectors)) return true;
+      if (ancestor.closest(selectors) || ancestor.closest(PRIVATE_REGION) || ancestor.closest(ADULT_MARKER)) return true;
       if (!is4chan && ancestor.closest("form")) return true;
+    }
+    if (isReddit) {
+      let post = element.closest(REDDIT_POST);
+      const inThread = /^\/(?:r\/[^/]+\/)?comments\/[a-z0-9]+(?:\/|$)/i.test(location.pathname);
+      if (!post && !inThread && (isMobileReddit || element.closest(REDDIT_COMMENT))) return true;
+      while (post) {
+        if (!privacyCache.has(post)) privacyCache.set(post, adultMarked(post));
+        if (privacyCache.get(post)) return true;
+        post = post.parentElement?.closest(REDDIT_POST);
+      }
     }
     if (isLinuxDo) {
       if (element.closest(LINUX_DO_EXCLUDED)) return true;
-      if (sidebarLabel) return false;
-      const path = location.pathname;
-      if (!LINUX_DO_FORUM_PATH.test(path)) return true;
-      // Direct messages also use /t/ URLs. Wait for Discourse to identify a regular topic.
-      return LINUX_DO_TOPIC_PATH.test(path) && !document.body?.classList.contains("archetype-regular");
+      return false;
     }
     if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
@@ -1674,10 +2008,10 @@
     return false;
   }
 
-  function eligible(node, root) {
+  function eligible(node, root, privacyCache) {
     const parent = node.parentElement;
     const match = parent && targetSelector(parent);
-    if (!match || !root.isConnected || parent.closest(match) !== root || excluded(parent)) return false;
+    if (!match || !root.isConnected || parent.closest(match) !== root || excluded(parent, privacyCache)) return false;
     if (is4chan && parent.closest(CHAN_POST_CONTEXT) !== root.closest(CHAN_POST_CONTEXT)) return false;
     const closedDetails = parent.closest("details:not([open])");
     if (closedDetails && !closedDetails.querySelector(":scope > summary")?.contains(parent)) return false;
@@ -1701,9 +2035,10 @@
   function renderGroup(group) {
     const nodes = new Map();
     const clipCache = new Map();
+    const privacyCache = new WeakMap();
     for (const { node, state, part, root, start } of group.refs) {
       if (part.ready === null || part.output !== null || states.get(node) !== state ||
-        node.data !== state.rendered || !eligible(node, root) ||
+        node.data !== state.rendered || !eligible(node, root, privacyCache) ||
         !textInView(node, start, start + part.value.length, clipCache)) continue;
       part.output = part.leading + part.ready + part.trailing;
       part.ready = null;
@@ -1720,20 +2055,22 @@
   }
 
   function collect() {
+    if (!translationAllowed()) return [];
     const groups = [];
     const clipCache = new Map();
+    const privacyCache = new WeakMap();
     let chars = 0;
     let count = 0;
     const now = Date.now();
     const roots = Array.from(visibleTargets, root => [root, root.getBoundingClientRect().top]);
     roots.sort((a, b) => a[1] - b[1]);
     for (const [root] of roots) {
-      if (!root.isConnected || excluded(root)) continue;
+      if (!root.isConnected || excluded(root, privacyCache)) continue;
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let previousBlock;
       let group;
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!node.data.trim() || !eligible(node, root)) continue;
+        if (previousPageText.has(node) || !eligible(node, root, privacyCache) || !node.data.trim()) continue;
         const state = textState(node);
         if (!state) continue;
         const block = node.parentElement.closest(TEXT_BLOCK) ?? root;
@@ -1774,15 +2111,33 @@
   }
 
   function runBatch(groups) {
-    const batch = sendTranslation(settings, key, groups);
-    active = batch;
+    const config = settings;
+    const apiKey = key;
     const requestRoute = route;
-    const current = () => active === batch && currentRoute() === requestRoute;
+    const partsAllowed = () => {
+      const privacyCache = new WeakMap();
+      return groups.every(group => group.refs.every(({ node, root, state }) =>
+        states.get(node) === state && node.data === state.rendered && eligible(node, root, privacyCache)));
+    };
+    const permitted = () => {
+      if (route !== requestRoute || !translationAllowed() || !partsAllowed()) return false;
+      try {
+        return apiKey === readApiKey(config.provider, config.customBaseUrl) &&
+          JSON.stringify(config) === JSON.stringify(normalizeSettings(GM_getValue(SETTINGS)));
+      } catch {
+        return false;
+      }
+    };
+    const batch = sendTranslation(config, apiKey, groups, permitted);
+    batch.partsAllowed = partsAllowed;
+    active = batch;
+    const current = () => active === batch && permitted();
     batch.result.then(results => {
       if (!current()) return;
       if (!results.size) notifyError(ui.statusInvalidResponse);
       else lastStatus = "";
       const savedAt = Date.now();
+      const useDisk = canUseDiskCache();
       groups.forEach((group, index) => {
         const output = results.get(index);
         if (!output) {
@@ -1791,7 +2146,7 @@
         }
         if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value);
         cache.set(outputKey(group), { output, savedAt });
-        group.refs.forEach(({ part }, i) => storeCachedPart(part, output[i], savedAt));
+        if (useDisk) group.refs.forEach(({ part }, i) => storeCachedPart(part, output[i], savedAt));
         rememberGroup(group, output, savedAt);
       });
       if (results.size) maintainTranslationCache(savedAt);
@@ -1815,8 +2170,8 @@
 
   function flush() {
     timer = undefined;
-    refreshRoute();
-    if (active || blocked || dialog || showingOriginal || document.hidden || !browsePage()) return;
+    const observing = observer;
+    if (!refreshPage() || observer !== observing || active || blocked) return;
     if (Date.now() < cooldown) {
       schedule(0);
       return;
@@ -1826,13 +2181,14 @@
     const pending = [];
     let rendered = false;
     const now = Date.now();
+    const useDisk = canUseDiskCache();
     for (const group of groups) {
       const saved = cache.get(outputKey(group));
       if (saved && saved.savedAt <= now && now - saved.savedAt < TRANSLATION_CACHE_TTL) {
         rememberGroup(group, saved.output, saved.savedAt);
       }
       for (const { part } of group.refs) {
-        if (part.ready !== null) continue;
+        if (!useDisk || part.ready !== null) continue;
         const entry = readCachedPart(part, now);
         if (entry) {
           part.ready = entry.text;
@@ -1875,7 +2231,8 @@
       label { display:grid; gap:.2rem; }
       label.toggle { display:flex; align-items:center; gap:.45rem; }
       label[hidden] { display:none; }
-      input:not([type="checkbox"]), select, button { font:inherit; min-width:0; padding:.34rem .5rem; }
+      input:not([type="checkbox"]), select, button, textarea { font:inherit; min-width:0; padding:.34rem .5rem; }
+      details > :not(summary) { margin-top:.5rem; }
       p { margin:0; font-size:.9rem; }
       .hint { opacity:.82; font-size:.84rem; }
       .actions { display:flex; flex-wrap:wrap; gap:.5rem; }
@@ -1887,25 +2244,67 @@
         max-height: calc(var(--viewport-height, 100dvh) - 1.5rem);
         padding: 1rem; overscroll-behavior: contain;
       }
-      dialog[data-touch] :is(button, select, input:not([type="checkbox"])) { min-height: 44px; font-size: max(16px, 1rem); }
+      dialog[data-touch] :is(button, select, textarea, input:not([type="checkbox"])) { min-height: 44px; font-size: max(16px, 1rem); }
       dialog[data-touch] .toggle { min-height: 44px; }
       dialog[data-touch] .shortcuts { display: none; }
     `;
     const title = document.createElement("h2");
     title.textContent = ui.title;
     const form = document.createElement("form");
-    const control = (label, element, className = "") => {
+    const control = (label, element, className = "", container = form) => {
       const wrapper = document.createElement("label");
       wrapper.className = className;
       if (className === "toggle") wrapper.append(element, label);
       else wrapper.append(label, element);
-      form.append(wrapper);
+      container.append(wrapper);
       return { element, wrapper };
     };
 
-    const { element: siteEnabled } = control(ui.enableOnSite(CURRENT_SITE), document.createElement("input"), "toggle");
+    const sitePolicyAtOpen = readSitePolicy();
+    let cachePolicyAtOpen = readCachePolicy();
+    const { element: siteEnabled } = control(ui.enableOnSite(SITE_LABEL), document.createElement("input"), "toggle");
     siteEnabled.type = "checkbox";
-    siteEnabled.checked = isSiteEnabled();
+    siteEnabled.checked = sitePolicyAtOpen.enabled && !sitePolicyAtOpen.siteBlocked;
+    siteEnabled.disabled = sitePolicyAtOpen.siteBlocked;
+
+    const privacy = document.createElement("details");
+    const privacyTitle = document.createElement("summary");
+    privacyTitle.textContent = ui.privacySettings;
+    privacy.append(privacyTitle);
+    form.append(privacy);
+    const { element: siteBlocked } = control(ui.blockSite(CURRENT_SITE), document.createElement("input"), "toggle", privacy);
+    siteBlocked.type = "checkbox";
+    siteBlocked.checked = sitePolicyAtOpen.siteBlocked;
+    siteBlocked.addEventListener("change", event => {
+      if (!event.isTrusted) return;
+      siteEnabled.disabled = siteBlocked.checked;
+      if (siteBlocked.checked) siteEnabled.checked = false;
+    });
+    const { element: allowedPaths } = control(ui.allowPaths, document.createElement("textarea"), "", privacy);
+    const { element: blockedPaths } = control(ui.blockPaths, document.createElement("textarea"), "", privacy);
+    for (const [input, paths] of [[allowedPaths, sitePolicyAtOpen.allow], [blockedPaths, sitePolicyAtOpen.deny]]) {
+      input.rows = 2;
+      input.spellcheck = false;
+      input.value = paths.join("\n");
+    }
+    const pathHint = document.createElement("p");
+    pathHint.className = "hint";
+    pathHint.textContent = ui.pathHint;
+    privacy.append(pathHint);
+    const { element: persistCache } = control(ui.persistCache, document.createElement("input"), "toggle", privacy);
+    persistCache.type = "checkbox";
+    persistCache.checked = cachePolicyAtOpen.persistent;
+    const privacyStatus = document.createElement("p");
+    privacyStatus.setAttribute("role", "status");
+    privacy.append(actionButton(ui.clearCache, () => {
+      let cleared = false;
+      try {
+        cleared = resetCachePolicy(readCachePolicy().persistent);
+        cachePolicyAtOpen = readCachePolicy();
+        persistCache.checked = cachePolicyAtOpen.persistent;
+      } catch {}
+      privacyStatus.textContent = cleared ? ui.cacheCleared : ui.cacheClearFailed;
+    }), privacyStatus);
 
     const { element: uiLangSelect } = control(ui.uiLanguage, document.createElement("select"));
     const { element: language } = control(ui.targetLanguage, document.createElement("select"));
@@ -1933,11 +2332,6 @@
     const { element: speed, wrapper: speedWrapper } = control(ui.speed, document.createElement("select"));
     const { element: effort, wrapper: effortWrapper } = control(ui.effort, document.createElement("select"));
 
-    const { element: keyInput } = control(ui.apiKey, document.createElement("input"));
-    keyInput.type = "password";
-    keyInput.autocomplete = "off";
-    keyInput.spellcheck = false;
-
     fillSelect(uiLangSelect, [["auto", ui.uiAuto], ...Object.entries(UI_LOCALE_NAMES)], settings.uiLanguage);
     fillSelect(language, Object.entries(LANGUAGES), settings.language);
     fillSelect(provider, Object.entries(PROVIDERS).map(([id, item]) => [id, item.name]), settings.provider);
@@ -1954,12 +2348,12 @@
     notice.textContent = ui.notice;
     const status = document.createElement("p");
     status.setAttribute("role", "status");
-    status.textContent = lastStatus;
-    status.hidden = !lastStatus;
+    status.textContent = !transportSupported() ? ui.transportUnavailable
+      : !routeAllowed(sitePolicyAtOpen) || !documentAllowed() ? ui.privacyBlocked : lastStatus;
+    status.hidden = !status.textContent;
 
     let models = new Map();
     let lookup;
-    let listedKey;
 
     function isCustomProvider() {
       return provider.value === "custom";
@@ -2042,9 +2436,6 @@
       const custom = providerId === "custom";
       const baseUrl = custom ? normalizeBaseUrl(customUrlInput.value) : "";
       const providerKey = readApiKey(providerId, baseUrl);
-      listedKey = providerKey;
-      keyInput.placeholder = providerKey ? ui.apiKeySavedPlaceholder
-        : custom ? ui.apiKeyOptionalPlaceholder : ui.apiKeyPlaceholder;
       models = new Map(Object.entries(PROVIDERS[providerId].models));
       if (!custom && selected?.modelOptions?.provider === providerId && selected.modelOptions.model === selected.model) {
         models.set(selected.model, selected.modelOptions);
@@ -2052,7 +2443,13 @@
       keyStatus.textContent = providerKey ? ui.keySaved : custom ? ui.keyOptional : ui.keyRequired;
       deleteKeyBtn.disabled = !providerKey;
 
-      refresh.disabled = custom ? !baseUrl : !providerKey;
+      refresh.disabled = !transportSupported() || (custom ? !baseUrl : !providerKey);
+
+      if (!transportSupported()) {
+        modelStatus.textContent = ui.transportUnavailable;
+        renderModels(selected);
+        return;
+      }
 
       if (custom && (!baseUrl || !refreshCustom)) {
         modelStatus.textContent = baseUrl ? ui.customModelHint : ui.modelNeedsBaseUrl;
@@ -2098,44 +2495,39 @@
     }
 
     function validateKey(value) {
-      const minLength = isCustomProvider() ? 1 : 8;
-      if (value.length < minLength || !/^[\x21-\x7e]{1,512}$/.test(value)) {
+      if (!validApiKey(provider.value, value)) {
         keyStatus.textContent = ui.keyInvalid;
-        keyInput.focus();
         return false;
       }
       return true;
     }
 
     function saveApiKey() {
-      const value = keyInput.value.trim();
       const baseUrl = normalizeBaseUrl(customUrlInput.value);
       if (isCustomProvider() && !baseUrl) {
         modelStatus.textContent = ui.baseUrlInvalid;
         customUrlInput.focus();
         return;
       }
+      // A closed shadow root still retargets composed keyboard events to the page.
+      const entry = window.prompt(ui.keyPrompt(isCustomProvider() ? baseUrl : PROVIDERS[provider.value].name));
+      if (entry === null) return;
+      const value = entry.trim();
       if (!validateKey(value)) return;
       const selected = selectedModel();
       writeApiKey(provider.value, baseUrl, value);
-      keyInput.value = "";
       if (settings.provider === provider.value) updateSettings();
       updateProvider(selected);
     }
 
-    provider.addEventListener("change", () => {
-      keyInput.value = "";
-      updateProvider();
+    provider.addEventListener("change", event => {
+      if (event.isTrusted) updateProvider();
     });
-    model.addEventListener("change", () => updateModel());
-    customUrlInput.addEventListener("input", () => {
-      if (isCustomProvider()) updateProvider(selectedModel());
+    model.addEventListener("change", event => {
+      if (event.isTrusted) updateModel();
     });
-    keyInput.addEventListener("keydown", event => {
-      if (event.key === "Enter" && event.isTrusted) {
-        event.preventDefault();
-        saveApiKey();
-      }
+    customUrlInput.addEventListener("input", event => {
+      if (event.isTrusted && isCustomProvider()) updateProvider(selectedModel());
     });
 
     const keyActions = document.createElement("div");
@@ -2148,7 +2540,7 @@
       updateProvider(selected);
     });
     const refresh = actionButton(ui.refreshModels, () => updateProvider(selectedModel(), true));
-    keyActions.append(actionButton(ui.saveKey, saveApiKey), deleteKeyBtn, refresh);
+    keyActions.append(actionButton(ui.setKey, saveApiKey), deleteKeyBtn, refresh);
     const actions = document.createElement("div");
     actions.className = "actions submit";
     const save = actionButton(ui.save, null, "submit");
@@ -2159,29 +2551,42 @@
       if (!event.isTrusted || lookup) return;
       const custom = isCustomProvider();
       const baseUrl = normalizeBaseUrl(customUrlInput.value);
-      const pendingKey = keyInput.value.trim();
       const providerKey = readApiKey(provider.value, baseUrl);
-      if (!pendingKey && providerKey !== listedKey) {
-        updateProvider(selectedModel());
+      const chosen = selectedModel();
+      const readPaths = input => normalizeRules(input.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean));
+      const allow = readPaths(allowedPaths);
+      const deny = readPaths(blockedPaths);
+      const showPrivacyStatus = message => {
+        privacy.open = true;
+        privacyStatus.textContent = message;
+      };
+      if (!allow || !deny) {
+        showPrivacyStatus(ui.invalidPaths);
         return;
       }
-      const chosen = selectedModel();
+      const site = { enabled: siteEnabled.checked && !siteBlocked.checked, allow, deny, siteBlocked: siteBlocked.checked };
+      const initialSite = { ...sitePolicyAtOpen, enabled: sitePolicyAtOpen.enabled && !sitePolicyAtOpen.siteBlocked };
+      const changedSite = JSON.stringify(site) !== JSON.stringify(initialSite);
+      const changedCache = persistCache.checked !== cachePolicyAtOpen.persistent;
+      if ((changedSite && JSON.stringify(readSitePolicy()) !== JSON.stringify(sitePolicyAtOpen)) ||
+        (changedCache && readCachePolicy().generation !== cachePolicyAtOpen.generation)) {
+        showPrivacyStatus(ui.privacyChanged);
+        return;
+      }
 
-      if (custom && !baseUrl && (customUrlInput.value.trim() || pendingKey)) {
+      if (custom && !baseUrl && customUrlInput.value.trim()) {
         modelStatus.textContent = ui.baseUrlInvalid;
         customUrlInput.focus();
         return;
       }
-      if (pendingKey && !validateKey(pendingKey)) return;
-      if (siteEnabled.checked) {
+      if (site.enabled) {
         if (custom && !baseUrl) {
           modelStatus.textContent = ui.needBaseUrlBeforeEnable;
           customUrlInput.focus();
           return;
         }
-        if (!custom && !(pendingKey || providerKey)) {
+        if (!custom && !providerKey) {
           keyStatus.textContent = ui.needKeyBeforeEnable;
-          keyInput.focus();
           return;
         }
         if (!validModelId(chosen.model)) {
@@ -2199,22 +2604,27 @@
         customModel: custom ? chosen.model : settings.customModel,
         ...chosen,
       });
-      if (pendingKey) writeApiKey(provider.value, baseUrl, pendingKey);
+      if (changedSite && site.siteBlocked) GM_setValue(SITE_BLOCK, true);
+      if (changedSite) GM_setValue(SITE_POLICY, { enabled: false, allow, deny });
+      if (changedCache && !resetCachePolicy(persistCache.checked)) showToast(ui.cacheClearFailed, true);
       GM_setValue(SETTINGS, nextSettings);
-      setSiteEnabled(siteEnabled.checked);
+      if (changedSite && site.enabled) GM_setValue(SITE_POLICY, { enabled: true, allow, deny });
+      if (changedSite && !site.siteBlocked && sitePolicyAtOpen.siteBlocked) GM_setValue(SITE_BLOCK, false);
+      updateSettings();
       panel.close();
     });
     panel.append(title, form);
     shadow.append(style, panel);
     document.documentElement.append(host);
     dialog = panel;
+    refreshPage();
     panel.toggleAttribute("data-touch", touchInput.matches);
     layoutTouchDialog();
     panel.addEventListener("close", () => {
       cancelLookup();
       host.remove();
       dialog = null;
-      schedule();
+      refreshPage();
     }, { once: true });
     panel.showModal();
     updateProvider(settings);
@@ -2242,20 +2652,39 @@
   GM_addValueChangeListener(SETTINGS, (_name, _old, _new, remote) => {
     if (remote) updateSettings();
   });
-  GM_addValueChangeListener(ENABLED_SITES, (_name, _old, value, remote) => {
-    if (!remote) return;
-    const wasEnabled = isSiteEnabled();
-    enabledSites = normalizeEnabledSites(value);
-    if (isSiteEnabled() !== wasEnabled) updateSettings();
+  function updateSitePolicy() {
+    stopTranslation();
+    refreshPage();
+    registerMenus();
+  }
+  for (const name of [SITE_POLICY, SITE_BLOCK]) {
+    GM_addValueChangeListener(name, (_name, _old, _new, remote) => {
+      if (remote) updateSitePolicy();
+    });
+  }
+  GM_addValueChangeListener(ENABLED_SITES, (_name, old, value, remote) => {
+    if (remote && LEGACY_SCOPE && GM_getValue(SITE_POLICY) === undefined &&
+      normalizeEnabledSites(old).includes(SITE_KEY) !== normalizeEnabledSites(value).includes(SITE_KEY)) updateSitePolicy();
+  });
+  GM_addValueChangeListener(CACHE_POLICY, (_name, _old, _new, remote) => {
+    if (remote) updateCachePolicy();
   });
   for (const provider of Object.keys(PROVIDERS)) {
     GM_addValueChangeListener(keyName(provider), (_name, _old, _new, remote) => {
       if (remote && settings.provider === provider) updateSettings();
     });
   }
-  window.addEventListener("popstate", () => {
-    refreshRoute();
-    schedule();
+  for (const type of ["popstate", "hashchange", "urlchange"]) window.addEventListener(type, refreshPage);
+  window.navigation?.addEventListener("currententrychange", refreshPage);
+  window.addEventListener("pagehide", event => {
+    if (!event.isTrusted) return;
+    pageSuspended = true;
+    refreshPage();
+  });
+  window.addEventListener("pageshow", event => {
+    if (!event.isTrusted) return;
+    pageSuspended = false;
+    refreshPage();
   });
   window.addEventListener("scroll", scheduleScroll, { passive: true, capture: true });
   window.addEventListener("resize", () => schedule(), { passive: true });
@@ -2265,10 +2694,14 @@
   }
   visualViewport?.addEventListener("resize", onVisualViewportChange, { passive: true });
   visualViewport?.addEventListener("scroll", onVisualViewportChange, { passive: true });
-  document.addEventListener("visibilitychange", () => schedule());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && (!cachePolicy.persistent || readSitePolicy().enabled)) maintainTranslationCache();
+    refreshPage();
+  });
   if (is4chan) {
     document.addEventListener("4chanXInitFinished", scanChanEvent);
     document.addEventListener("PostsInserted", scanChanEvent);
   }
-  begin();
+  if (!cachePolicy.persistent || readSitePolicy().enabled) maintainTranslationCache();
+  refreshPage();
 })();
