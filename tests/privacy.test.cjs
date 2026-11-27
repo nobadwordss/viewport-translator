@@ -89,7 +89,7 @@ async function browserTests() {
               resolve({
                 ok: response.status >= 200 && response.status < 300, status: response.status,
                 url: response.finalUrl, text: async () => response.responseText,
-                headers: new win.Headers(),
+                headers: new win.Headers(response.headers),
               });
             },
           };
@@ -151,9 +151,9 @@ async function browserTests() {
     assert(tab.requests.length === 0, message);
   };
   const inputGroups = call => JSON.parse(JSON.parse(call.details.data).input);
-  const complete = call => {
+  const complete = (call, translate = () => "Translated text") => {
     const translations = inputGroups(call).map(({ id, parts }) =>
-      ({ id, parts: parts.map(() => "Translated text") }));
+      ({ id, parts: parts.map(translate) }));
     call.details.onload({
       status: 200,
       finalUrl: call.details.url,
@@ -165,6 +165,42 @@ async function browserTests() {
     });
   };
   const waitRequest = tab => until(() => tab.requests.length > 0, "No request for eligible content");
+
+  // Freeze only the fixture window after its first request. The test runner keeps real time.
+  function freezeTime(win) {
+    let now = Math.floor(Date.now() / 1000) * 1000;
+    let id = 0;
+    const timers = new Map();
+    const clearNative = win.clearTimeout.bind(win);
+    win.Date.now = () => now;
+    win.setTimeout = (callback, delay) => {
+      assert(delay >= 0 && delay <= 2 ** 31 - 1, "Delay exceeds the browser timer range");
+      timers.set(--id, { when: now + delay, callback });
+      return id;
+    };
+    win.clearTimeout = handle => {
+      if (!timers.delete(handle)) clearNative(handle);
+    };
+    return {
+      get now() { return now; },
+      scheduledAt(when) { return Array.from(timers.values()).some(timer => timer.when === when); },
+      advance(ms) {
+        now += ms;
+        const due = Array.from(timers).sort((a, b) => a[1].when - b[1].when);
+        for (const [handle, { when, callback }] of due) {
+          if (when <= now && timers.delete(handle)) callback();
+        }
+      },
+    };
+  }
+
+  function rateLimit(call, header) {
+    call.details.onload({
+      status: 429, finalUrl: call.details.url, responseText: "",
+      headers: header == null ? {} : { "Retry-After": header },
+      responseHeaders: header == null ? "" : "Content-Type: application/json\r\nrEtRy-AfTeR:\t" + header + "\r\n",
+    });
+  }
 
   const cases = [
     ["fresh install and fabricated page events", async () => {
@@ -287,6 +323,119 @@ async function browserTests() {
       await noSend(privateTopic, "Linux.do private message sent text");
       const publicTopic = await open({ ...topic, setup: doc => { doc.body.className = "archetype-regular"; } });
       await waitRequest(publicTopic);
+    }],
+    ["Phoronix home cards translate after opt-in and on scroll, then restore", async () => {
+      const tab = await open({
+        host: "www.phoronix.com",
+        html: "<div id=main><article><header><a href='/news/one'>First headline</a></header>" +
+          "<div class=details>Story metadata</div><p>First summary</p></article>" +
+          "<article style='margin-top:800px'><header><a href='/news/two'>Second headline</a></header></article></div>",
+      });
+      const main = tab.doc.querySelector("#main");
+      const original = main.innerHTML;
+      const [first, second] = main.querySelectorAll("header a");
+      await noSend(tab, "Phoronix translated before site opt-in");
+      tab.menu(/^Enable on/);
+      await waitRequest(tab);
+      const parts = inputGroups(tab.requests[0]).flatMap(group => group.parts);
+      assert(parts.length === 2 && parts.includes("First headline") && parts.includes("First summary"),
+        "The visible card title and summary should be the only parts in the first batch");
+      complete(tab.requests[0]);
+      await until(() => first.textContent === "Translated text", "Card headline did not render");
+      second.scrollIntoView();
+      await until(() => tab.requests.length === 2, "Scrolling to the next card did not translate it");
+      assert(inputGroups(tab.requests[1])[0].parts[0] === "Second headline", "Wrong card after scrolling");
+      complete(tab.requests[1]);
+      await until(() => second.textContent === "Translated text", "Second headline did not render");
+      tab.menu(/^Show Original Text/);
+      assert(main.innerHTML === original && main.querySelector("a") === first, "Original cards or links were lost");
+    }],
+    ["Phoronix articles preserve bare text, inline links and review paragraphs", async () => {
+      const shared = storage([defaultKey, ["site-policy:phoronix.com", site(true)]]);
+      const tab = await open({
+        shared, host: "phoronix.com", path: "/news/example",
+        html: "<div id=main><article class=full><h1>Story headline</h1><div class=author>Byline</div>" +
+          "<div class=content>Opening <a href='/news/source'>source link</a> continues.<br><br>Next paragraph." +
+          "<p>Review paragraph.</p><code>Code sample</code><form>Form text</form><aside>Sidebar text</aside>" +
+          "<span data-private>Private text</span></div></article></div>",
+      });
+      const article = tab.doc.querySelector("article");
+      const original = article.innerHTML;
+      const link = article.querySelector("a");
+      await waitRequest(tab);
+      const groups = inputGroups(tab.requests[0]);
+      const parts = groups.flatMap(group => group.parts);
+      const expected = ["Story headline", "Opening", "source link", "continues.", "Next paragraph.", "Review paragraph."];
+      assert(parts.length === expected.length && expected.every(part => parts.includes(part)), "Incorrect article text selected");
+      assert(groups.some(({ parts }) => parts.slice(0, 3).join("|") === "Opening|source link|continues."),
+        "Inline link lost its surrounding sentence");
+      complete(tab.requests[0]);
+      await until(() => link.textContent === "Translated text", "Inline article text did not render");
+      assert(article.querySelector("a") === link && link.getAttribute("href") === "/news/source" &&
+        article.querySelectorAll("br").length === 2, "Rendering damaged the inline markup");
+      tab.menu(/^Show Original Text/);
+      assert(article.innerHTML === original, "Original article text was not restored");
+    }],
+    ["Phoronix review index links are scoped to the publication", async () => {
+      const other = "phoronix.com.example.test";
+      const shared = storage([defaultKey, ["enabled-sites", ["phoronix.com", other]]]);
+      const html = "<div id=main><a href='/review/one'>Review title</a><br>" +
+        "<strong><a href='/review/two'>Featured review</a></strong></div>";
+      const index = await open({ shared, host: "www.phoronix.com", path: "/reviews", html });
+      await waitRequest(index);
+      const parts = inputGroups(index.requests[0]).flatMap(group => group.parts);
+      assert(parts.includes("Review title") && parts.includes("Featured review"), "Review index titles were skipped");
+      const unrelated = await open({ shared, host: other, path: "/reviews", html });
+      await noSend(unrelated, "Publication-specific selectors ran on another host");
+      const account = await open({ shared, host: "www.phoronix.com", path: "/account", html });
+      await noSend(account, "Publication-specific selectors bypassed route exclusions");
+    }],
+    ["Phoronix paginated reviews and news archives keep ordinary text blocks", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["phoronix.com"]]]);
+      const review = await open({
+        shared, host: "www.phoronix.com", path: "/review/example/2",
+        html: "<div id=main><article class=full><h1>Benchmark results</h1><div class=content>" +
+          "<p>The <em>second run</em> finished sooner.</p></div>" +
+          "<select><option>Next page option</option></select></article></div>",
+      });
+      await waitRequest(review);
+      const parts = inputGroups(review.requests[0]).flatMap(group => group.parts);
+      assert(parts.join("|") === "Benchmark results|The|second run|finished sooner.",
+        "Nested review paragraphs were duplicated, skipped or mixed with the page selector");
+      const archive = await open({
+        shared, host: "www.phoronix.com", path: "/news",
+        html: "<div id=main><table><tr><td><a href='/news/example'>Archive headline</a></td></tr></table></div>",
+      });
+      await waitRequest(archive);
+      assert(inputGroups(archive.requests[0])[0].parts[0] === "Archive headline", "Archive table link was skipped");
+    }],
+    ["existing elements can become translation targets after insertion", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["example.test", "phoronix.com"]]]);
+      const generic = await open({ shared, html: "<div>Late heading</div>" });
+      await noSend(generic, "A plain div was collected before becoming a heading");
+      generic.doc.querySelector("div").setAttribute("role", "heading");
+      await waitRequest(generic);
+      const news = await open({
+        shared, host: "www.phoronix.com", path: "/news/example",
+        html: "<div id=main><article><div class=content>Late article body</div></article></div>",
+      });
+      await noSend(news, "An unclassified article container was collected");
+      news.doc.querySelector("article").className = "full";
+      await waitRequest(news);
+    }],
+    ["changing an eligible region to an editor cancels its translation", async () => {
+      const tab = await open({ shared: storage([defaultKey, ["enabled-sites", ["example.test"]]]) });
+      await waitRequest(tab);
+      const paragraph = tab.doc.querySelector("p");
+      paragraph.contentEditable = "true";
+      await until(() => tab.requests[0].aborted, "A request stayed active after editing began");
+      paragraph.textContent = "Draft text";
+      await sleep(300);
+      assert(tab.requests.length === 1 && paragraph.textContent === "Draft text", "The editor was translated");
+      paragraph.textContent = "Published text";
+      paragraph.contentEditable = "false";
+      await until(() => tab.requests.length === 2, "Translation did not resume after editing");
+      assert(inputGroups(tab.requests[1])[0].parts[0] === "Published text", "A draft was queued for later");
     }],
     ["disable locally aborts and disconnects", async () => {
       const tab = await open({ shared: storage([defaultKey, ["enabled-sites", ["example.test"]]]) });
@@ -422,13 +571,36 @@ async function browserTests() {
       assert(local.requests[0].details.url === "http://localhost:11434/v1/chat/completions" &&
         !local.requests[0].details.headers.Authorization, "Custom endpoint was wrong or received a key for a different URL");
     }],
+    ["saving a stale settings dialog preserves a newer translation endpoint", async () => {
+      const initial = { provider: "custom", customBaseUrl: "https://first.test/v1", model: "fixture" };
+      const shared = storage([["settings", initial]]);
+      const tab = await open({ shared });
+      let settingsRoot;
+      const prototype = tab.win.Element.prototype;
+      const attachShadow = prototype.attachShadow;
+      prototype.attachShadow = function (options) {
+        settingsRoot = attachShadow.call(this, options);
+        return settingsRoot;
+      };
+      try { tab.menu(/^Translator Settings$/); } finally { prototype.attachShadow = attachShadow; }
+      const form = settingsRoot.querySelector("form");
+      const latest = { ...initial, customBaseUrl: "https://second.test/v1" };
+      shared.write("settings", latest);
+      form.requestSubmit();
+      assert(shared.values.get("settings").customBaseUrl === latest.customBaseUrl,
+        "A stale dialog restored the previous endpoint for all sites");
+      assert(settingsRoot.querySelector("dialog").open && form.textContent.includes("another tab"),
+        "The dialog did not explain the settings conflict");
+    }],
     ["cache expiry, opt-in and generation reset", async () => {
-      const expiredKey = "translation:v2:" + "2".repeat(64);
+      const contextlessKey = "translation:v2:" + "2".repeat(64);
+      const expiredKey = "translation:v3:" + "3".repeat(64);
       const shared = storage([
         defaultKey, ["enabled-sites", ["example.test"]],
         ["translation-cache-policy", { persistent: true, generation }],
         [oldCacheKey, { text: "Legacy cached text", savedAt: Date.now() }],
-        [expiredKey, { text: "Expired text", savedAt: Date.now() - 86400001, generation }],
+        [contextlessKey, { text: "Fresh but contextless", savedAt: Date.now(), generation }],
+        [expiredKey, { output: ["Expired text"], savedAt: Date.now() - 86400001, generation }],
       ]);
       const tab = await open({ shared });
       await waitRequest(tab);
@@ -439,6 +611,115 @@ async function browserTests() {
       shared.write("translation-cache-policy", { persistent: true, generation: "b".repeat(32) });
       await until(() => tab.requests.length === 2, "Old cache was reused after reset");
       await until(() => keys.every(key => !shared.values.has(key)), "Reset left an old generation on disk");
+    }],
+    ["persistent translations distinguish sentences and reuse matching context across tabs", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["example.test"]],
+        ["translation-cache-policy", { persistent: true, generation }]]);
+      const source = "<p>Admission is <em>free</em> today.</p>";
+      const first = await open({ shared, html: source });
+      await waitRequest(first);
+      complete(first.requests[0], part => part === "free" ? "무료" : "번역");
+      await until(() => first.doc.querySelector("em").textContent === "무료", "First translation did not render");
+      const second = await open({ shared, html: "<p>Please <em>free</em> the memory.</p>" });
+      await waitRequest(second);
+      assert(inputGroups(second.requests[0])[0].parts.join("|") === "Please|free|the memory.",
+        "A different sentence reused a word from the first translation");
+      complete(second.requests[0], part => part === "free" ? "해제" : "번역");
+      await until(() => second.doc.querySelector("em").textContent === "해제", "Second meaning did not render");
+      const revisit = await open({ shared, html: source });
+      await until(() => revisit.doc.querySelector("em").textContent === "무료", "Matching sentence missed the disk cache");
+      assert(revisit.requests.length === 0, "Identical context sent a new request");
+    }],
+    ["persistent translations preserve repeated pieces by their position", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["example.test"]],
+        ["translation-cache-policy", { persistent: true, generation }]]);
+      const html = "<p><b>free</b> the space to stay <em>free</em>.</p>";
+      const first = await open({ shared, html });
+      await waitRequest(first);
+      assert(inputGroups(first.requests[0])[0].parts.join("|") === "free|the space to stay|free", "Unexpected grouping");
+      complete(first.requests[0], (_part, index) => ["해제", "중간", "여유"][index]);
+      await until(() => first.doc.querySelector("em").textContent === "여유", "Initial positions did not render");
+      const revisit = await open({ shared, html });
+      await until(() => revisit.doc.querySelector("b").textContent === "해제", "Cached group did not render");
+      assert(revisit.doc.querySelector("em").textContent === "여유" && revisit.requests.length === 0,
+        "Identical words at different positions shared one disk value");
+      const [key] = diskKeys(shared.values);
+      shared.write(key, { ...shared.values.get(key), output: ["해제"] });
+      const incomplete = await open({ shared, html });
+      await waitRequest(incomplete);
+      assert(inputGroups(incomplete.requests[0])[0].parts.length === 3, "A partial cache entry split the request context");
+    }],
+    ["an in-flight edit stores only the updated sentence under its own key", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["example.test"]],
+        ["translation-cache-policy", { persistent: true, generation }]]);
+      const html = "<p><em>free</em> admission today</p>";
+      const tab = await open({ shared, html });
+      await waitRequest(tab);
+      tab.doc.querySelector("p").lastChild.data = " the buffer";
+      await until(() => tab.requests.length === 2, "Changed sentence was not requested again");
+      assert(tab.requests[0].aborted, "Obsolete sentence request stayed active");
+      complete(tab.requests[1], part => part === "free" ? "해제" : "번역");
+      await until(() => tab.doc.querySelector("em").textContent === "해제", "Changed sentence did not render");
+      const revisit = await open({ shared, html });
+      await waitRequest(revisit);
+      assert(inputGroups(revisit.requests[0])[0].parts.join("|") === "free|admission today",
+        "An edited sentence wrote to the previous context's disk key");
+    }],
+    ...["Tampermonkey", "Violentmonkey"].map(scriptHandler =>
+      [scriptHandler + " honors delay-seconds and HTTP-date Retry-After", async () => {
+        for (const useDate of [false, true]) {
+          const tab = await open({ scriptHandler, shared: storage([defaultKey, ["enabled-sites", ["example.test"]]]) });
+          await waitRequest(tab);
+          const clock = freezeTime(tab.win);
+          rateLimit(tab.requests[0], useDate ? new Date(clock.now + 600_000).toUTCString() : "600");
+          await sleep(0);
+          clock.advance(120_000);
+          assert(tab.requests.length === 1, "Retried at the old two-minute cap");
+          tab.navigate("/next-article");
+          await until(() => clock.scheduledAt(clock.now + 480_000), "Navigation lost the provider deadline");
+          clock.advance(479_999);
+          assert(tab.requests.length === 1, "Retried before the provider deadline after navigation");
+          clock.advance(1);
+          await until(() => tab.requests.length === 2, "Did not retry when the provider deadline arrived");
+          complete(tab.requests[1]);
+        }
+      }]),
+    ["switching providers preserves each translation endpoint's deadline", async () => {
+      const shared = storage([defaultKey, ["enabled-sites", ["example.test"]]]);
+      const tab = await open({ shared });
+      await waitRequest(tab);
+      const clock = freezeTime(tab.win);
+      const deadline = clock.now + 600_000;
+      rateLimit(tab.requests[0], "600");
+      await until(() => clock.scheduledAt(deadline), "Provider cooldown was not scheduled");
+      shared.write("settings", { provider: "custom", customBaseUrl: "https://other.test/v1", model: "fixture" });
+      await until(() => {
+        clock.advance(200);
+        return tab.requests.length === 2;
+      }, "A different endpoint inherited the first provider's cooldown");
+      assert(tab.requests[1].details.url === "https://other.test/v1/chat/completions", "Wrong endpoint was called");
+      shared.write("settings", { provider: "openai" });
+      await until(() => clock.scheduledAt(deadline), "Returning to the first provider lost its deadline");
+      clock.advance(deadline - clock.now - 1);
+      assert(tab.requests.length === 2, "Returning to the first provider retried early");
+      clock.advance(1);
+      await until(() => tab.requests.length === 3, "First provider did not resume after the deadline");
+    }],
+    ["429 falls back on invalid or missing headers and handles very long delays", async () => {
+      const longSeconds = 3_000_000;
+      for (const [header, wait] of [[null, 15_000], ["600oops", 15_000], ["2", 2000], [String(longSeconds), longSeconds * 1000]]) {
+        const tab = await open({ shared: storage([defaultKey, ["enabled-sites", ["example.test"]]]) });
+        await waitRequest(tab);
+        const clock = freezeTime(tab.win);
+        const deadline = clock.now + wait;
+        rateLimit(tab.requests[0], header);
+        await sleep(0);
+        if (wait > 2 ** 31 - 1) clock.advance(2 ** 31 - 1);
+        clock.advance(deadline - clock.now - 1);
+        assert(tab.requests.length === 1, "Invalid header or timer overflow caused an early retry");
+        clock.advance(1);
+        await until(() => tab.requests.length === 2, "Retry did not follow its expected wait");
+      }
     }],
     ["incognito, undetectable private state, and obsolete redirect transport", async () => {
       for (const options of [{ incognito: true }, { incognito: null }, { managerVersion: "4.9" }]) {

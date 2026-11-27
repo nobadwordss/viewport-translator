@@ -5,12 +5,12 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.6.1
-// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, and Linux.do.
-// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do 전용 규칙을 지원합니다.
-// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do専用ルールにも対応。
-// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili 和 Linux.do 专用规则。
-// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili 和 Linux.do 專用規則。
+// @version 0.6.3
+// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, Linux.do, and Phoronix.
+// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do, Phoronix 전용 규칙을 지원합니다.
+// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do・Phoronix専用ルールにも対応。
+// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili、Linux.do 和 Phoronix 专用规则。
+// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili、Linux.do 和 Phoronix 專用規則。
 // @license MIT
 // @homepageURL https://github.com/nobadwordss/viewport-translator
 // @supportURL https://github.com/nobadwordss/viewport-translator/issues
@@ -114,6 +114,7 @@
       cacheClearFailed: "Could not finish deleting the translation cache.",
       invalidPaths: "Use valid paths beginning with /, one per line (up to 100 per list).",
       privacyChanged: "Privacy settings changed in another tab. Reopen settings to edit them.",
+      settingsChanged: "Translation settings changed in another tab. Reopen settings to edit them.",
       privacyBlocked: "Privacy protection blocks translation on this page.",
       setKey: "Set API Key…",
       keyPrompt: endpoint => `Enter the API key for ${endpoint}. The browser prompt displays what you type.`,
@@ -188,6 +189,7 @@
       cacheClearFailed: "번역 캐시를 모두 삭제하지 못했습니다.",
       invalidPaths: "/로 시작하는 올바른 경로를 한 줄에 하나씩 입력하세요. 목록마다 최대 100개입니다.",
       privacyChanged: "다른 탭에서 개인정보 보호 설정이 변경되었습니다. 설정을 다시 열어 변경하세요.",
+      settingsChanged: "다른 탭에서 번역 설정이 변경되었습니다. 설정을 다시 열어 변경하세요.",
       privacyBlocked: "개인정보 보호 규칙에 따라 이 페이지의 번역이 차단됩니다.",
       setKey: "API 키 설정…",
       keyPrompt: endpoint => `${endpoint}의 API 키를 입력하세요. 브라우저 창에 입력한 키가 표시됩니다.`,
@@ -262,6 +264,7 @@
       cacheClearFailed: "翻訳キャッシュをすべて削除できませんでした。",
       invalidPaths: "/ で始まる有効なパスを1行に1つ入力してください。各リストは最大100件です。",
       privacyChanged: "別のタブでプライバシー設定が変更されました。設定を開き直してください。",
+      settingsChanged: "別のタブで翻訳設定が変更されました。設定を開き直してください。",
       privacyBlocked: "プライバシー保護によりこのページの翻訳はブロックされています。",
       setKey: "APIキーを設定…",
       keyPrompt: endpoint => `${endpoint} のAPIキーを入力してください。入力内容はブラウザーのダイアログに表示されます。`,
@@ -336,6 +339,7 @@
       cacheClearFailed: "无法清除全部翻译缓存。",
       invalidPaths: "请每行输入一个以 / 开头的有效路径，每个列表最多 100 条。",
       privacyChanged: "其他标签页已更改隐私设置。请重新打开设置后编辑。",
+      settingsChanged: "其他标签页已更改翻译设置。请重新打开设置后编辑。",
       privacyBlocked: "隐私保护规则已阻止翻译此页面。",
       setKey: "设置 API 密钥…",
       keyPrompt: endpoint => `请输入 ${endpoint} 的 API 密钥。浏览器对话框会显示输入的内容。`,
@@ -410,6 +414,7 @@
       cacheClearFailed: "無法清除所有翻譯快取。",
       invalidPaths: "請每行輸入一個以 / 開頭的有效路徑，每個清單最多 100 條。",
       privacyChanged: "其他分頁已變更隱私設定。請重新開啟設定後編輯。",
+      settingsChanged: "其他分頁已變更翻譯設定。請重新開啟設定後編輯。",
       privacyBlocked: "隱私保護規則已封鎖此頁面的翻譯。",
       setKey: "設定 API 金鑰…",
       keyPrompt: endpoint => `請輸入 ${endpoint} 的 API 金鑰。瀏覽器的對話框會顯示輸入的內容。`,
@@ -619,6 +624,10 @@
   ].join(",");
   const LINUX_DO_FORUM_PATH = /^\/(?:$|(?:t|c|categories|tag|tags|latest|new|unread|unseen|top|hot)(?:\/|$))/;
   const LINUX_DO_TOPIC_PATH = /^\/t\//;
+  const PHORONIX_TARGETS = [
+    "#main > article > header > a", "#main > article.full > .content",
+    "#main > a[href^='/review/']", "#main > strong > a[href^='/review/']",
+  ].join(",");
 
   // Tier 1: Generic fallback engine
   const TEXT_BLOCK = [
@@ -671,11 +680,12 @@
   const CHAN_WORKSAFE = new Set(("3 a adv an biz c cgl ck co diy f fa fit g gd his i ic int jp k lit m mlp mu n news o out p " +
     "po pw qst sci sp tg toy trv tv v vg vm vmg vp vr vrpg vst vt w wg wsg wsr x xs").split(" "));
   const VISIBLE_SECRET = /\b(?:authorization\s*:\s*)?(?:bearer|basic)\s+[a-z0-9+/_=.-]{16,}|\b(?:api[ _-]*key|access[ _-]*token|client[ _-]*secret|password|passcode)\s*[:=]\s*[^\s]{6,}|\b(?:sk-(?:proj-|ant-)?[a-z0-9_-]{16,}|AIza[a-z0-9_-]{30,}|eyJ[a-z0-9_-]{10,}\.[a-z0-9_-]{10,}\.[a-z0-9_-]{10,})|-----BEGIN [A-Z ]*PRIVATE KEY-----|[?#&](?:access_token|id_token|refresh_token|token|api_key|password|client_secret)=[^\s&#]+/i;
+  const TARGET_ATTRIBUTES = ["class", "id", "role", "slot", "href", "data-testid", "data-section-name"];
   const MUTATION_OPTIONS = {
     subtree: true, childList: true, characterData: true, attributes: true,
-    attributeFilter: ["hidden", "aria-hidden", "class", "style", "open", "revealed", "type", "autocomplete",
-      "content", "name", "property", "role", "data-private", "data-sensitive", "data-visibility", "data-testid", "aria-label",
-      "title", "id", "post-id", "thingid", "data-fullname", ...ADULT_ATTRIBUTES],
+    attributeFilter: [...TARGET_ATTRIBUTES, "hidden", "aria-hidden", "inert", "contenteditable", "translate",
+      "style", "open", "revealed", "type", "autocomplete", "content", "name", "property", "data-private",
+      "data-sensitive", "data-visibility", "aria-label", "title", "post-id", "thingid", "data-fullname", ...ADULT_ATTRIBUTES],
   };
   const CHAN_BOARD_FORM = "form#delform[name='delform']";
   const CHAN_POST_CONTEXT = ".post, .inline, #qp";
@@ -692,12 +702,13 @@
   const CHARS_PER_BATCH = 2800;
   const PARTS_PER_BATCH = 24;
   const CACHE_LIMIT = 450;
-  const TRANSLATION_CACHE_PREFIX = "translation:v2:";
-  const TRANSLATION_CACHE_KEY = /^translation:v[12]:[a-f0-9]{64}$/;
+  const TRANSLATION_CACHE_PREFIX = "translation:v3:";
+  const TRANSLATION_CACHE_KEY = /^translation:v[123]:[a-f0-9]{64}$/;
   const TRANSLATION_CACHE_TTL = 24 * 60 * 60 * 1000;
   const STORED_TRANSLATION_LIMIT = 5000;
   const STORED_TRANSLATION_CHAR_LIMIT = 1_500_000;
   const CACHE_PRUNE_INTERVAL = 10 * 60 * 1000;
+  const MAX_TIMER_DELAY = 2 ** 31 - 1;
   const RESCAN_DELAY = 150;
   const ROUTE_CHECK_DELAY = 1000;
   const MAX_ENABLED_SITES = 500;
@@ -976,12 +987,25 @@
 
   const transport = selectTransport();
 
+  function retryAfterDeadline(header) {
+    let value = header?.trim() ?? "";
+    if (/^\d+$/.test(value)) return Math.min(Number.MAX_SAFE_INTEGER, Date.now() + Number(value) * 1000);
+    // HTTP dates use UTC, including the obsolete asctime form that omits its zone.
+    if (/^[A-Za-z]{3} [A-Za-z]{3} (?: \d|\d{2}) \d{2}:\d{2}:\d{2} \d{4}$/.test(value)) {
+      value += " GMT";
+    } else if (!/^[A-Za-z]+, (?:\d{2} [A-Za-z]{3} \d{4}|\d{2}-[A-Za-z]{3}-\d{2}) \d{2}:\d{2}:\d{2} GMT$/i.test(value)) {
+      return undefined;
+    }
+    const deadline = Date.parse(value);
+    return Number.isFinite(deadline) ? deadline : undefined;
+  }
+
   function requestJson({ method, url, headers, body, timeout, permit }) {
     let request;
     const result = new Promise((resolve, reject) => {
-      const fail = (status, retryAfter = 0) => {
+      const fail = (status, retryAt) => {
         clearTimeout(deadline);
-        reject({ status, retryAfter });
+        reject({ status, retryAt });
       };
       // Some userscript managers ignore the request timeout in fetch mode.
       const deadline = setTimeout(() => {
@@ -991,7 +1015,7 @@
       const finish = (status, responseUrl, responseText, retryAfter) => {
         clearTimeout(deadline);
         if (status < 200 || status >= 300) {
-          fail(status, Number(retryAfter) || 0);
+          fail(status, retryAfterDeadline(retryAfter));
           return;
         }
         try {
@@ -1034,7 +1058,7 @@
           ontimeout: () => fail("timeout"),
           onload(response) {
             finish(response.status, response.finalUrl, response.responseText,
-              /^retry-after:\s*(\d+)/im.exec(response.responseHeaders ?? "")?.[1]);
+              /^retry-after:[ \t]*([^\r\n]*)/im.exec(response.responseHeaders ?? "")?.[1]);
           },
         });
       } catch {
@@ -1265,6 +1289,8 @@
   const isMobileBilibili = location.hostname === "m.bilibili.com";
   const isBilibili = isMobileBilibili || /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
   const isLinuxDo = /^(?:www\.)?linux\.do$/.test(location.hostname);
+  const isPhoronix = /^(?:www\.)?phoronix\.com$/.test(canonicalHost);
+  // Phoronix adds editorial targets to the generic engine and uses its layout exclusions.
   const isGeneric = !isReddit && !is4chan && !isBilibili && !isLinuxDo;
   // Keep opt-in for each mobile subdomain explicit, including existing preferences.
   const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
@@ -1281,8 +1307,10 @@
   const isMobileSite = isMobileReddit || isMobileBilibili;
   const selector = isMobileBilibili ? `${BILI_MOBILE_TARGETS},${TEXT_BLOCK}`
     : isMobileReddit ? `${REDDIT_TARGETS},${TEXT_BLOCK}`
+    : isPhoronix ? `${TEXT_BLOCK},${PHORONIX_TARGETS}`
     : isLinuxDo ? LINUX_DO_TARGETS
     : isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : TEXT_BLOCK;
+  const targetAttributes = selector === TEXT_BLOCK ? ["role"] : TARGET_ATTRIBUTES;
   const touchInput = window.matchMedia("(pointer: coarse)");
   const visualViewport = window.visualViewport;
 
@@ -1312,7 +1340,7 @@
   let active;
   let dialog;
   let showingOriginal = false;
-  let cooldown = 0;
+  const cooldowns = new Map();
   let blocked = false;
   let lastStatus = "";
   let lastErrorToastAt = 0;
@@ -1591,12 +1619,14 @@
     return live.persistent && live.generation === cachePolicy.generation && Boolean(window.crypto?.subtle);
   }
 
-  async function translationCacheKey(config, originalNodeText, sourcePart) {
+  function providerScope(config) {
+    return config.provider === "custom" ? `custom:${config.customBaseUrl}` : config.provider;
+  }
+
+  async function translationCacheKey(config, context) {
     try {
-      const { language, provider, model, effort, customBaseUrl } = config;
-      const scope = provider === "custom" ? `${provider}:${customBaseUrl}` : provider;
-      const input = JSON.stringify([cachePolicy.generation, SITE_POLICY, language, scope, model, effort,
-        originalNodeText.trim(), sourcePart]);
+      const input = JSON.stringify([cachePolicy.generation, SITE_POLICY, config.language, providerScope(config),
+        config.model, config.effort, context]);
       const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
       const hex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
       return TRANSLATION_CACHE_PREFIX + hex;
@@ -1605,28 +1635,33 @@
     }
   }
 
-  function translationCacheEntry(entry, now, sourceLength = CHARS_PER_PART) {
+  function translationCacheEntry(entry, now, parts) {
     if (entry?.generation !== cachePolicy.generation || !Number.isSafeInteger(entry?.savedAt) ||
-      entry.savedAt < 0 || entry.savedAt > now ||
-      now - entry.savedAt >= TRANSLATION_CACHE_TTL || !validTranslatedPart(entry.text, sourceLength)) return null;
+      entry.savedAt < 0 || entry.savedAt > now || now - entry.savedAt >= TRANSLATION_CACHE_TTL) return null;
+    const output = entry.output;
+    if (!Array.isArray(output) || !output.length || output.length > PARTS_PER_BATCH ||
+      (parts && output.length !== parts.length)) return null;
+    for (let i = 0; i < output.length; i += 1) {
+      if (!validTranslatedPart(output[i], parts ? parts[i].length : CHARS_PER_PART)) return null;
+    }
     return entry;
   }
 
-  function readCachedPart(part, now) {
-    if (!part.cacheKey) return null;
+  function readCachedGroup(group, now) {
+    if (!group.cacheKey) return null;
     try {
-      return translationCacheEntry(GM_getValue(part.cacheKey), now, part.value.length);
+      return translationCacheEntry(GM_getValue(group.cacheKey), now, group.parts);
     } catch {
       return null;
     }
   }
 
-  function storeCachedPart(part, text, savedAt) {
-    if (!part.cacheKey) return;
+  function storeCachedGroup(group, output, savedAt) {
+    if (!group.cacheKey) return;
     try {
-      if (readCachedPart(part, savedAt)) return;
-      GM_setValue(part.cacheKey, { text, savedAt, generation: cachePolicy.generation });
-      storedWrites += 1;
+      if (readCachedGroup(group, savedAt)) return;
+      GM_setValue(group.cacheKey, { output, savedAt, generation: cachePolicy.generation });
+      storedWrites += output.length;
     } catch {
       // The tab cache remains available if extension storage cannot be written.
     }
@@ -1643,19 +1678,24 @@
       const live = [];
       for (const name of GM_listValues()) {
         if (!TRANSLATION_CACHE_KEY.test(name)) continue;
-        const entry = livePolicy.persistent ? translationCacheEntry(GM_getValue(name), now) : null;
-        if (entry) live.push({ name, ...entry });
-        else GM_deleteValue(name);
+        const entry = livePolicy.persistent && name.startsWith(TRANSLATION_CACHE_PREFIX)
+          ? translationCacheEntry(GM_getValue(name), now) : null;
+        if (!entry) {
+          GM_deleteValue(name);
+          continue;
+        }
+        const chars = entry.output.reduce((sum, text) => sum + text.length, 0);
+        live.push({ name, savedAt: entry.savedAt, parts: entry.output.length, chars });
       }
       live.sort((a, b) => b.savedAt - a.savedAt);
       let count = 0;
       let chars = 0;
-      for (const { name, text, savedAt } of live) {
-        if (count >= STORED_TRANSLATION_LIMIT || chars + text.length > STORED_TRANSLATION_CHAR_LIMIT) {
-          if (GM_getValue(name)?.savedAt === savedAt) GM_deleteValue(name);
+      for (const entry of live) {
+        if (count + entry.parts > STORED_TRANSLATION_LIMIT || chars + entry.chars > STORED_TRANSLATION_CHAR_LIMIT) {
+          if (GM_getValue(entry.name)?.savedAt === entry.savedAt) GM_deleteValue(entry.name);
         } else {
-          count += 1;
-          chars += text.length;
+          count += entry.parts;
+          chars += entry.chars;
         }
       }
       return true;
@@ -1670,16 +1710,19 @@
     const lookups = [];
     let waiting = false;
     for (const group of groups) {
-      for (const { part, state } of group.refs) {
-        if (part.ready !== null) continue;
-        if (part.cacheKey === undefined) {
-          part.cacheKey = "";  // Hashing is in progress. Null means storage is unavailable.
-          lookups.push(translationCacheKey(settings, state.original, part.value).then(cacheKey => {
-            part.cacheKey = cacheKey;
-          }));
-        }
-        waiting ||= part.cacheKey === "";
+      if (group.refs.every(({ part }) => part.ready !== null)) continue;
+      const sources = new Set(group.refs.map(({ state }) => state));
+      const context = JSON.stringify([group.parts, Array.from(sources, state => state.original.trim())]);
+      // Groups are rebuilt after hashing. Memoize on the first part, which can join a different group on rescan.
+      const first = group.refs[0].part;
+      let lookup = first.diskLookup;
+      if (lookup?.context !== context) {
+        lookup = { context, key: undefined };
+        first.diskLookup = lookup;
+        lookups.push(translationCacheKey(settings, context).then(key => { lookup.key = key; }));
       }
+      group.cacheKey = lookup.key;
+      waiting ||= lookup.key === undefined;
     }
     if (lookups.length) Promise.all(lookups).then(() => schedule(0));
     return !waiting;
@@ -1702,10 +1745,18 @@
     return maintainTranslationCache(Date.now(), true);
   }
 
+  function remainingCooldown() {
+    const scope = providerScope(settings);
+    const remaining = (cooldowns.get(scope) ?? 0) - Date.now();
+    if (remaining > 0) return remaining;
+    cooldowns.delete(scope);
+    return 0;
+  }
+
   function schedule(delay = RESCAN_DELAY) {
     if (timer !== undefined || !observer || dialog || showingOriginal || document.hidden) return;
-    const wait = Math.max(delay, cooldown - Date.now());
-    timer = setTimeout(flush, wait);
+    const wait = Math.max(delay, remainingCooldown());
+    timer = setTimeout(flush, Math.min(wait, MAX_TIMER_DELAY));
   }
 
   function scheduleScroll() {
@@ -1810,12 +1861,14 @@
         if (match && record.target.parentElement?.closest(match)) changed = true;
         continue;
       }
-      record.addedNodes.forEach(scan);
-      removed ||= record.removedNodes.length > 0;
-      const match = targetSelector(record.target);
-      changed ||= record.type === "childList" || record.type === "attributes" ||
-        (isBilibili && commentRoots.has(record.target.getRootNode())) ||
-        Boolean(match && (record.target.closest?.(match) || record.target.querySelector?.(match)));
+      if (record.type === "childList") {
+        record.addedNodes.forEach(scan);
+        removed ||= record.removedNodes.length > 0;
+      } else if (targetAttributes.includes(record.attributeName)) {
+        // Changing an ancestor can make existing descendants match a site selector.
+        scan(record.target);
+      }
+      changed = true;
     }
     if (removed) prune();
     if (changed && active && !active.partsAllowed()) abortActive();
@@ -1875,7 +1928,6 @@
     uiLocale = resolveUiLocale(settings.uiLanguage);
     ui = UI_STRINGS[uiLocale];
     key = readApiKey(settings.provider, settings.customBaseUrl);
-    cooldown = 0;
     blocked = false;
     lastStatus = "";
     registerMenus();
@@ -1893,7 +1945,6 @@
       stopTranslation();
       quarantineOnResume ||= routeProtected;
       route = next;
-      cooldown = 0;
       blocked = false;
     }
     const policy = readSitePolicy();
@@ -2174,20 +2225,23 @@
         }
         if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value);
         cache.set(outputKey(group), { output, savedAt });
-        if (useDisk) group.refs.forEach(({ part }, i) => storeCachedPart(part, output[i], savedAt));
+        if (useDisk) storeCachedGroup(group, output, savedAt);
         rememberGroup(group, output, savedAt);
       });
       if (results.size) maintainTranslationCache(savedAt);
     }).catch(error => {
-      if (!current()) return;
-      const { status, retryAfter } = error ?? {};
+      const { status, retryAt } = error ?? {};
       const transient = status === 429 || status >= 500 || status === "network" || status === "timeout";
-      const retrySeconds = Math.min(120, Math.max(status === 429 ? 15 : 5, retryAfter || 0));
+      if (transient) {
+        const scope = providerScope(config);
+        const until = retryAt ?? Date.now() + (status === 429 ? 15_000 : 5_000);
+        cooldowns.set(scope, Math.max(cooldowns.get(scope) ?? 0, until));
+      }
+      if (!current()) return;
       const message = status === "config" ? ui.statusConfigError
         : typeof status === "number" ? ui.statusHttpError(status) : ui.statusReadError;
       notifyError(message);
       if (!transient && status !== "response") blocked = true;
-      if (transient) cooldown = Date.now() + retrySeconds * 1000;
       groups.forEach(group => group.refs.forEach(({ part }) => { part.failures += 1; }));
     }).finally(() => {
       if (active !== batch) return;
@@ -2200,7 +2254,7 @@
     timer = undefined;
     const observing = observer;
     if (!refreshPage() || observer !== observing || active || blocked) return;
-    if (Date.now() < cooldown) {
+    if (remainingCooldown() > 0) {
       schedule(0);
       return;
     }
@@ -2214,14 +2268,9 @@
       const saved = cache.get(outputKey(group));
       if (saved && saved.savedAt <= now && now - saved.savedAt < TRANSLATION_CACHE_TTL) {
         rememberGroup(group, saved.output, saved.savedAt);
-      }
-      for (const { part } of group.refs) {
-        if (!useDisk || part.ready !== null) continue;
-        const entry = readCachedPart(part, now);
-        if (entry) {
-          part.ready = entry.text;
-          part.readyUntil = entry.savedAt + TRANSLATION_CACHE_TTL;
-        }
+      } else if (useDisk) {
+        const entry = readCachedGroup(group, now);
+        if (entry) rememberGroup(group, entry.output, entry.savedAt);
       }
       if (group.refs.some(({ part }) => part.ready !== null)) {
         if (renderGroup(group)) rendered = true;
@@ -2288,6 +2337,7 @@
       return { element, wrapper };
     };
 
+    const settingsAtOpen = JSON.stringify(settings);
     const sitePolicyAtOpen = readSitePolicy();
     let cachePolicyAtOpen = readCachePolicy();
     const { element: siteEnabled } = control(ui.enableOnSite(SITE_LABEL), document.createElement("input"), "toggle");
@@ -2577,6 +2627,11 @@
     form.addEventListener("submit", event => {
       event.preventDefault();
       if (!event.isTrusted || lookup) return;
+      if (JSON.stringify(normalizeSettings(GM_getValue(SETTINGS))) !== settingsAtOpen) {
+        status.textContent = ui.settingsChanged;
+        status.hidden = false;
+        return;
+      }
       const custom = isCustomProvider();
       const baseUrl = normalizeBaseUrl(customUrlInput.value);
       const providerKey = readApiKey(provider.value, baseUrl);
