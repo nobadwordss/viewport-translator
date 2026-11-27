@@ -523,6 +523,118 @@ async function browserTests() {
         assert(tab.watches.size === 0, "A protected wiki view started observation on " + path);
       }
     }],
+    ["Amazon Japan homepage translates visible shopping cards after opt-in and restores links", async () => {
+      const tab = await open({ host: "www.amazon.co.jp", path: "/ref=nav_logo",
+        html: "<div id=store><header><p>個人のお届け先</p></header><div id=gwm-Deck>" +
+          "<div data-card-metrics-id='single-creative-card_gateway_0'><div class=a-cardui-header>" +
+          "<h3><span class=wdTitle>季節の特集</span></h3><span class=wdSubTitle>注目のアイテム</span></div></div>" +
+          "<div data-card-metrics-id='multi-category-card_gateway_1'><a href='/b?node=123'>" +
+          "<span class=a-truncate><span class=a-truncate-full>文房具</span>" +
+          "<span class=aok-offscreen>読み上げ用の複製</span></span></a></div>" +
+          "<div data-card-metrics-id='your-orders_gateway_2'><div class=a-cardui-header><h2>個人の注文履歴</h2></div></div>" +
+          "<span class=a-price>価格は三千円</span></div></div>" });
+      const store = tab.doc.querySelector("#store");
+      const original = store.innerHTML;
+      const link = store.querySelector("a");
+      await noSend(tab, "Amazon sent text before site opt-in");
+      tab.menu(/^Enable on/);
+      await waitRequest(tab);
+      const parts = inputGroups(tab.requests[0]).flatMap(group => group.parts);
+      assert(parts.join("|") === "季節の特集|注目のアイテム|文房具", "Wrong Amazon homepage text selected");
+      complete(tab.requests[0]);
+      await until(() => link.querySelector(".a-truncate-full").textContent === "Translated text", "Category label did not render");
+      tab.menu(/^Show Original Text/);
+      assert(store.innerHTML === original && store.querySelector("a") === link, "Original Amazon homepage markup was lost");
+    }],
+    ["Amazon Japan sale cards stop translating if the page replaces a promotion with a personal card", async () => {
+      const tab = await open({ shared: storage([defaultKey, ["site-policy:amazon.co.jp", site(true)]]),
+        host: "www.amazon.co.jp", path: "/blackfriday/7/",
+        html: "<div id=sale data-card-metrics-id='pcpo-offer_deals-events-atf-desktop_16'>" +
+          "<a href='/b' class=a-link-normal><div aria-label='生活家電'><div aria-hidden=true>" +
+          "<span class=a-truncate><span class=a-truncate-full>生活家電</span><span aria-hidden=true>複製</span></span>" +
+          "</div></div></a><span class=a-price>参考価格二千円</span></div><div id=inactive aria-hidden=true></div>",
+        setup: doc => {
+          const copy = doc.querySelector("#sale").cloneNode(true);
+          copy.removeAttribute("id");
+          doc.querySelector("#inactive").append(copy);
+        },
+      });
+      await waitRequest(tab);
+      assert(inputGroups(tab.requests[0]).flatMap(group => group.parts).join("|") === "生活家電", "Wrong sale text selected");
+      tab.doc.querySelector("#sale").setAttribute("data-card-metrics-id", "your-orders_gateway_0");
+      await until(() => tab.requests[0].aborted, "Changing the card to a personal widget left its request active");
+      tab.doc.querySelector(".a-truncate-full").textContent = "購入履歴";
+      await sleep(300);
+      assert(tab.requests.length === 1, "A personal card was queued after replacing a sale promotion");
+    }],
+    ["Amazon Japan search translates result titles as cards enter the viewport or acquire their marker", async () => {
+      const tab = await open({ shared: storage([defaultKey, ["site-policy:amazon.co.jp", site(true)]]),
+        host: "amazon.co.jp", path: "/-/en/s?k=private-query",
+        html: "<h2>Search results for private-query</h2><div data-component-type='s-search-result' data-asin='B000000001'>" +
+          "<a href='/dp/B000000001'><h2><span>最初のノート</span></h2></a><span class=a-price>千円</span></div>" +
+          "<div id=next style='margin-top:800px'><h2><a href='/dp/B000000002'>次のノート</a></h2></div>" });
+      await waitRequest(tab);
+      assert(inputGroups(tab.requests[0]).flatMap(group => group.parts).join("|") === "最初のノート",
+        "A search term, ASIN, price or offscreen result was sent");
+      complete(tab.requests[0]);
+      const next = tab.doc.querySelector("#next");
+      next.scrollIntoView();
+      await sleep(300);
+      assert(tab.requests.length === 1, "Unmarked search result was sent");
+      next.setAttribute("data-component-type", "s-search-result");
+      await until(() => tab.requests.length === 2, "A search result added during scrolling was missed");
+      assert(inputGroups(tab.requests[1]).flatMap(group => group.parts).join("|") === "次のノート", "Wrong second search result");
+    }],
+    ["Amazon Japan product descriptions, features and public reviews keep inline markup and omit purchase details", async () => {
+      const shared = storage([defaultKey, ["site-policy:amazon.co.jp", site(true)]]);
+      const tab = await open({ shared, host: "www.amazon.co.jp", path: "/鉛筆/dp/B000000001/ref=sr_1_1",
+        html: "<main><h1><span id=productTitle>木の鉛筆</span></h1><div id=feature-bullets><ul><li>書きやすい</li></ul></div>" +
+          "<div id=productDescription>毎日 <a href='/b'>学校で</a> 使えます。" +
+          "<span class=a-price>五百円</span><span itemprop=price>千円</span></div>" +
+          "<div id=productFactsDesktopExpander><h3 class=product-facts-title>商品の特徴</h3><ul><li>軽くて丈夫</li></ul></div>" +
+          "<div id=aplus><p>メーカーの説明</p></div><div id=buybox><p>配送先と購入者</p></div>" +
+          "<table id=productDetails_detailBullets_sections1><tr><th>ASIN</th><td>B000000001</td></tr></table></main>" });
+      const main = tab.doc.querySelector("main");
+      const original = main.innerHTML;
+      const link = main.querySelector("a");
+      await waitRequest(tab);
+      const groups = inputGroups(tab.requests[0]);
+      const parts = groups.flatMap(group => group.parts);
+      const expected = ["木の鉛筆", "書きやすい", "毎日", "学校で", "使えます。", "商品の特徴", "軽くて丈夫", "メーカーの説明"];
+      assert(parts.length === expected.length && expected.every(part => parts.includes(part)), "Wrong product fields selected");
+      assert(groups.some(group => group.parts.join("|") === "毎日|学校で|使えます。"), "Inline product link lost its context");
+      complete(tab.requests[0]);
+      await until(() => link.textContent === "Translated text", "Inline product description did not render");
+      tab.menu(/^Show Original Text/);
+      assert(main.innerHTML === original && main.querySelector("a") === link, "Original product markup was lost");
+      const reviews = await open({ shared, host: "www.amazon.co.jp", path: "/product-reviews/B000000001",
+        html: "<div data-hook=review><span class=a-profile-name>レビュアーの名前</span>" +
+          "<a data-hook=review-title><i><span class=a-icon-alt>星四つ</span></i><span>使いやすい</span></a>" +
+          "<div data-hook=review-body>毎日使っています。</div></div><form><p>未公開のレビュー</p></form>" });
+      await waitRequest(reviews);
+      assert(inputGroups(reviews.requests[0]).flatMap(group => group.parts).join("|") === "使いやすい|毎日使っています。",
+        "Wrong review text selected");
+    }],
+    ["Amazon Japan private routes stop translation, and other hosts keep their own rules", async () => {
+      const other = "amazon.co.jp.example.test";
+      const shared = storage([defaultKey, ["site-policy:amazon.co.jp", site(true)], ["site-policy:" + other, site(true)]]);
+      const html = "<span id=productTitle>商品タイトル</span><p>Ordinary prose</p>";
+      const options = { shared, host: "www.amazon.co.jp", html };
+      const tab = await open({ ...options, path: "/gp/aw/d/B000000001" });
+      await waitRequest(tab);
+      tab.navigate("/gp/your-account/order-history");
+      await until(() => tab.requests[0].aborted && tab.watches.size === 0, "Opening orders left the product request active");
+      for (const path of ["/gp/css/homepage.html", "/gp/cart/view.html", "/gp/buy/spc/handlers/display.html",
+        "/a/addresses", "/hz/wishlist/ls/fixture", "/ap/signin", "/review/create-review"]) {
+        const privatePage = await open({ ...options, path });
+        await noSend(privatePage, "Amazon sent text from " + path);
+        assert(privatePage.watches.size === 0, "Amazon observed " + path);
+      }
+      const unrelated = await open({ shared, host: other, path: "/dp/B000000001", html });
+      await waitRequest(unrelated);
+      assert(inputGroups(unrelated.requests[0]).flatMap(group => group.parts).join("|") === "Ordinary prose",
+        "Amazon-specific selectors reached an unrelated host");
+    }],
     ["existing elements can become translation targets after insertion", async () => {
       const shared = storage([defaultKey, ["enabled-sites", ["example.test", "phoronix.com"]]]);
       const generic = await open({ shared, html: "<div>Late heading</div>" });

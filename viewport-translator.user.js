@@ -5,12 +5,12 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.6.4
-// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes rules for Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux and ArchWiki.
-// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux, ArchWiki 전용 규칙을 지원합니다.
-// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do・Phoronix・Arch Linux・ArchWikiの専用ルールにも対応。
-// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux 和 ArchWiki 专用规则。
-// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux 和 ArchWiki 專用規則。
+// @version 0.6.5
+// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes rules for Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux, ArchWiki and Amazon.co.jp.
+// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux, ArchWiki, Amazon.co.jp 전용 규칙을 지원합니다.
+// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do・Phoronix・Arch Linux・ArchWiki・Amazon.co.jpの専用ルールにも対応。
+// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux、ArchWiki 和 Amazon.co.jp 专用规则。
+// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux、ArchWiki 和 Amazon.co.jp 專用規則。
 // @license MIT
 // @homepageURL https://github.com/nobadwordss/viewport-translator
 // @supportURL https://github.com/nobadwordss/viewport-translator/issues
@@ -637,6 +637,29 @@
   const ARCH_WIKI_EXCLUDED = [
     ".mw-editsection", ".vector-toc-numb", ".archwiki-template-pkg", ".archwiki-template-aur", ".archwiki-template-man",
   ].join(",");
+  const AMAZON_SHOPPING_CARD = ":is(" +
+    ["single-creative-card", "multi-category-card", "npack-asin-card", "quad-multi-asin-card", "pcpo-offer"]
+      .map(type => `[data-card-metrics-id^='${type}_']`).join(",") + ")";
+  const AMAZON_TARGETS = [
+    `${AMAZON_SHOPPING_CARD} .a-cardui-header :is(h2, h3, .wdSubTitle)`, `${AMAZON_SHOPPING_CARD} a .a-truncate`,
+    "#gwm-Deck .d-showcase-header .d-header-title", ".events-pcpo-placeholder-widget .carouselTitle",
+    "[data-card-metrics-id^='image-carousel_deals-'] .a-carousel-heading", "[data-component-type='s-search-result'] h2",
+    "#productTitle", "#ebooksProductTitle", "#feature-bullets :is(h1, h2, h3, li)",
+    "#productFactsDesktopExpander :is(.product-facts-title, li)", "#productDescription",
+    "#bookDescription_feature_div .a-expander-content", "#aplus :is(h1, h2, h3, h4, p, li)",
+    "[data-hook='review'] :is([data-hook='review-title'], [data-hook='review-body'])",
+  ].join(",");
+  const AMAZON_EXCLUDED = [
+    "#navbar", "#buybox", "#desktop_buybox", "#rightCol", ".a-button", ".a-profile",
+    ".a-price", ".a-text-price", ".a-color-price", "[itemprop~='price']",
+    ".a-offscreen", ".aok-offscreen", ".aok-hidden", ".a-icon-alt",
+  ].join(",");
+  const AMAZON_SALE_LABEL = "[data-card-metrics-id^='pcpo-offer_'] a.a-link-normal [aria-label] > [aria-hidden='true']";
+  const AMAZON_BROWSE_PATHS = [
+    /^\/$/, /^\/(?:[^/]+\/)?(?:s|b)$/i, /^\/(?:deals|blackfriday|primeday)(?:\/\d+)?$/i,
+    /^\/gp\/(?:browse\.html|goldbox|aw(?:\/s)?)$/i,
+    /^\/(?:(?:[^/]+\/)?(?:dp|product-reviews)|gp\/(?:product|aw\/d))\/[a-z0-9]{10}$/i,
+  ];
 
   // Tier 1: Generic fallback engine
   const TEXT_BLOCK = [
@@ -693,20 +716,13 @@
   const CHAN_WORKSAFE = new Set(("3 a adv an biz c cgl ck co diy f fa fit g gd his i ic int jp k lit m mlp mu n news o out p " +
     "po pw qst sci sp tg toy trv tv v vg vm vmg vp vr vrpg vst vt w wg wsg wsr x xs").split(" "));
   const VISIBLE_SECRET = /\b(?:authorization\s*:\s*)?(?:bearer|basic)\s+[a-z0-9+/_=.-]{16,}|\b(?:api[ _-]*key|access[ _-]*token|client[ _-]*secret|password|passcode)\s*[:=]\s*[^\s]{6,}|\b(?:sk-(?:proj-|ant-)?[a-z0-9_-]{16,}|AIza[a-z0-9_-]{30,}|eyJ[a-z0-9_-]{10,}\.[a-z0-9_-]{10,}\.[a-z0-9_-]{10,})|-----BEGIN [A-Z ]*PRIVATE KEY-----|[?#&](?:access_token|id_token|refresh_token|token|api_key|password|client_secret)=[^\s&#]+/i;
-  const TARGET_ATTRIBUTES = ["class", "id", "role", "slot", "href", "data-testid", "data-section-name"];
-  const MUTATION_OPTIONS = {
-    subtree: true, childList: true, characterData: true, attributes: true,
-    attributeFilter: [...TARGET_ATTRIBUTES, "hidden", "aria-hidden", "inert", "contenteditable", "translate",
-      "style", "open", "revealed", "type", "autocomplete", "content", "name", "property", "data-private",
-      "data-sensitive", "data-visibility", "aria-label", "title", "post-id", "thingid", "data-fullname", ...ADULT_ATTRIBUTES],
-  };
   const CHAN_BOARD_FORM = "form#delform[name='delform']";
   const CHAN_POST_CONTEXT = ".post, .inline, #qp";
   const CHAN_EXCLUDED = "a.backlink, a.hashlink, .stub, .prettyprint, .sjis, .inline, #qp";
   const EXCLUDED = [
     "script", "style", "noscript", "iframe", "svg", "math", "label", "input", "select",
     "textarea", "[contenteditable]:not([contenteditable='false'])", "[translate='no']", ".notranslate",
-    "[hidden]", "[aria-hidden='true']", "[inert]", "pre", "code", "kbd", "samp", "var",
+    "[hidden]", "[inert]", "pre", "code", "kbd", "samp", "var",
     "a.quotelink", "a.deadlink", ".abbr", ".expando-button", ".md-spoiler-text:not(.revealed)",
     "reddit-spoiler:not([revealed])", "shreddit-spoiler:not([revealed])", "s", "del",
   ].join(",");
@@ -1305,7 +1321,8 @@
   const isPhoronix = /^(?:www\.)?phoronix\.com$/.test(canonicalHost);
   const isArchLinux = /(?:^|\.)archlinux\.org$/.test(canonicalHost);
   const isArchWiki = canonicalHost === "wiki.archlinux.org";
-  // Phoronix and Arch Linux use the generic engine's layout exclusions.
+  const isAmazonJP = /^(?:www\.)?amazon\.co\.jp$/.test(canonicalHost);
+  // Phoronix, Arch Linux and Amazon use the generic engine's layout exclusions.
   const isGeneric = !isReddit && !is4chan && !isBilibili && !isLinuxDo;
   // Keep opt-in for each mobile subdomain explicit, including existing preferences.
   const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
@@ -1325,9 +1342,18 @@
     : isPhoronix ? `${TEXT_BLOCK},${PHORONIX_TARGETS}`
     : isArchWiki ? ARCH_WIKI_TARGETS
     : isArchLinux ? `${TEXT_BLOCK},${ARCH_NAV_LINK},#news .article-content`
+    : isAmazonJP ? AMAZON_TARGETS
     : isLinuxDo ? LINUX_DO_TARGETS
     : isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : TEXT_BLOCK;
+  const TARGET_ATTRIBUTES = ["class", "id", "role", "slot", "href", "data-testid", "data-section-name",
+    ...(isAmazonJP ? ["data-card-metrics-id", "data-component-type", "data-hook", "itemprop"] : [])];
   const targetAttributes = selector === TEXT_BLOCK ? ["role"] : TARGET_ATTRIBUTES;
+  const MUTATION_OPTIONS = {
+    subtree: true, childList: true, characterData: true, attributes: true,
+    attributeFilter: [...TARGET_ATTRIBUTES, "hidden", "aria-hidden", "inert", "contenteditable", "translate",
+      "style", "open", "revealed", "type", "autocomplete", "content", "name", "property", "data-private",
+      "data-sensitive", "data-visibility", "aria-label", "title", "post-id", "thingid", "data-fullname", ...ADULT_ATTRIBUTES],
+  };
   const touchInput = window.matchMedia("(pointer: coarse)");
   const visualViewport = window.visualViewport;
 
@@ -1401,6 +1427,10 @@
   }
 
   function browsePage(path) {
+    if (isAmazonJP) {
+      const page = path.replace(/^\/-\/[a-z]{2}(?:[-_][a-z]{2})?(?=\/|$)/i, "").replace(/\/ref=[^/]+$/i, "") || "/";
+      return AMAZON_BROWSE_PATHS.some(pattern => pattern.test(page));
+    }
     if (isArchWiki) {
       const params = new URLSearchParams(location.search);
       return !params.has("veaction") && params.getAll("action").every(action => action === "view") &&
@@ -2080,6 +2110,10 @@
     for (let ancestor = element; ancestor; ancestor = isBilibili ? ancestor.getRootNode().host : null) {
       if (ancestor.closest(selectors) || ancestor.closest(PRIVATE_REGION) || ancestor.closest(ADULT_MARKER)) return true;
       if (!is4chan && ancestor.closest("form")) return true;
+      const hidden = ancestor.closest("[aria-hidden='true']");
+      // Amazon sale cards supply an accessible label on the parent of the visible caption.
+      if (hidden && !(isAmazonJP && hidden.matches(AMAZON_SALE_LABEL) && hidden.contains(ancestor.closest(".a-truncate")) &&
+        !hidden.parentElement.closest("[aria-hidden='true']"))) return true;
     }
     if (isReddit) {
       let post = element.closest(REDDIT_POST);
@@ -2099,6 +2133,7 @@
       if (element.closest(isArchWiki ? ARCH_WIKI_EXCLUDED : ARCH_PACKAGE_FIELDS)) return true;
       if (element.closest(ARCH_NAV_LINK) || (isArchWiki && element.closest(ARCH_WIKI_TOC))) return false;
     }
+    if (isAmazonJP && element.closest(AMAZON_EXCLUDED)) return true;
     if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
       const header = element.closest("header");
