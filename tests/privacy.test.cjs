@@ -409,6 +409,120 @@ async function browserTests() {
       await waitRequest(archive);
       assert(inputGroups(archive.requests[0])[0].parts[0] === "Archive headline", "Archive table link was skipped");
     }],
+    ["Arch homepage translates the public menu and news and restores the original links", async () => {
+      const tab = await open({
+        host: "archlinux.org",
+        html: "<div id=page><header><div id=archnavbar><ul id=archnavbarlist>" +
+          "<li><a href='/packages/'>Packages</a></li></ul></div><nav><p>Account tools</p></nav></header>" +
+          "<div id=news><h3>Latest news</h3><div class=article-content>Read the " +
+          "<a href='/news/example/'>release notes</a> today.<p>More details follow.</p></div></div>" +
+          "<div id=pkg-updates><h3>Recent updates</h3><table><tr><td class=pkg-name>example-tool 2.1</td>" +
+          "<td class=pkg-arch>x86_64</td></tr></table></div></div>",
+      });
+      const page = tab.doc.querySelector("#page");
+      const original = page.innerHTML;
+      const link = page.querySelector("#archnavbar a");
+      await noSend(tab, "Arch homepage sent text before opt-in");
+      tab.menu(/^Enable on/);
+      await waitRequest(tab);
+      const groups = inputGroups(tab.requests[0]);
+      const parts = groups.flatMap(group => group.parts);
+      const expected = ["Packages", "Latest news", "Read the", "release notes", "today.", "More details follow.", "Recent updates"];
+      assert(parts.length === expected.length && expected.every(part => parts.includes(part)), "Wrong homepage text selected");
+      assert(groups.some(group => group.parts.join("|") === "Read the|release notes|today."), "Inline news link lost its context");
+      complete(tab.requests[0]);
+      await until(() => link.textContent === "Translated text", "Public Arch menu did not translate");
+      tab.menu(/^Show Original Text/);
+      assert(page.innerHTML === original && page.querySelector("#archnavbar a") === link, "Original homepage links were lost");
+    }],
+    ["Arch package details translate descriptions and keep package identifiers", async () => {
+      const tab = await open({
+        shared: storage([defaultKey, ["site-policy:archlinux.org", site(true)]]),
+        host: "archlinux.org", path: "/packages/extra/any/example-tool/",
+        html: "<div id=pkgdetails><h2>example-tool 2.1</h2><table id=pkginfo>" +
+          "<tr><th>Description</th><td itemprop=description>A tool for reading manuals</td></tr>" +
+          "<tr><th>Architecture</th><td>x86_64</td></tr></table><div id=pkgdeps><h3>Dependencies</h3>" +
+          "<ul id=pkgdepslist><li><a href='/packages/core/any/example-lib/'>example-lib</a>" +
+          "<span> (optional)</span></li></ul></div></div>",
+      });
+      await waitRequest(tab);
+      const parts = inputGroups(tab.requests[0]).flatMap(group => group.parts);
+      const expected = ["Description", "A tool for reading manuals", "Architecture", "Dependencies", "(optional)"];
+      assert(parts.length === expected.length && expected.every(part => parts.includes(part)), "Wrong package fields selected");
+    }],
+    ["ArchWiki translates the table of contents and scrolled notices while preserving technical markup", async () => {
+      const tab = await open({
+        shared: storage([defaultKey, ["site-policy:wiki.archlinux.org", site(true)]]),
+        host: "wiki.archlinux.org", path: "/title/Installation_guide",
+        setup: doc => { doc.body.className = "mediawiki ns-0 action-view"; },
+        html: "<div id=page><nav id=vector-toc><ul><li><a class=vector-toc-link href='#network'>" +
+          "<div class=vector-toc-text><span class=vector-toc-numb>1</span>Network setup</div></a></li></ul></nav>" +
+          "<main><header><h1 id=firstHeading>Installation guide</h1></header><div id=mw-content-text>" +
+          "<div class=mw-parser-output><div class=mw-heading><h2 id=network>Connect the network" +
+          "<span class=mw-editsection><a href='?action=edit'>Edit section</a></span></h2></div>" +
+          "<p>Install the <span class=archwiki-template-pkg><a href='/pkg'>example-pkg</a></span> package.</p>" +
+          "<div class='archwiki-template-box archwiki-template-box-tip' style='margin-top:750px'>" +
+          "<strong>Tip</strong> Review the <a href='/title/Networking'>network settings</a> before continuing." +
+          "<code>tool --verify</code><span class=archwiki-template-man><a href='/man'>tool(1)</a></span>" +
+          "<span class=archwiki-template-aur><a href='/pkg'>example-git</a></span><pre>shell command</pre>" +
+          "</div></div></div></main><p>Personal toolbar</p></div>",
+      });
+      const page = tab.doc.querySelector("#page");
+      const original = page.innerHTML;
+      const notice = page.querySelector(".archwiki-template-box");
+      const link = notice.querySelector("a");
+      await waitRequest(tab);
+      const parts = inputGroups(tab.requests[0]).flatMap(group => group.parts);
+      const expected = ["Network setup", "Installation guide", "Connect the network", "Install the", "package."];
+      assert(parts.length === expected.length && expected.every(part => parts.includes(part)), "Wrong initial wiki text selected");
+      complete(tab.requests[0]);
+      await until(() => page.querySelector("#firstHeading").textContent === "Translated text", "Wiki title did not render");
+      notice.scrollIntoView();
+      await until(() => tab.requests.length === 2, "Scrolled wiki notice did not translate");
+      const note = inputGroups(tab.requests[1]);
+      assert(note.length === 1 && note[0].parts.join("|") === "Tip|Review the|network settings|before continuing.",
+        "Notice lost inline context or included a command or manual reference");
+      complete(tab.requests[1]);
+      await until(() => link.textContent === "Translated text", "Wiki link did not render");
+      tab.menu(/^Show Original Text/);
+      assert(page.innerHTML === original && notice.querySelector("a") === link, "Original wiki markup was lost");
+    }],
+    ["Arch host matching uses a domain boundary and keeps subdomain consent separate", async () => {
+      const lookalikes = ["notarchlinux.org", "archlinux.org.example.test"];
+      const shared = storage([defaultKey, ["site-policy:archlinux.org", site(true)],
+        ...lookalikes.map(host => ["site-policy:" + host, site(true)])]);
+      const html = "<header><div id=archnavbar><ul id=archnavbarlist>" +
+        "<li><a href='/packages/'>Packages</a></li></ul></div></header>";
+      for (const host of ["wiki.archlinux.org", "bbs.archlinux.org"]) {
+        const tab = await open({ shared, host, html, setup: doc => { doc.body.className = "mediawiki ns-0 action-view"; } });
+        await noSend(tab, "Arch homepage opt-in enabled " + host);
+        tab.menu(/^Enable on/);
+        await waitRequest(tab);
+        assert(inputGroups(tab.requests[0])[0].parts[0] === "Packages", "Shared Arch menu missing on " + host);
+      }
+      for (const host of lookalikes) {
+        const tab = await open({ shared, host, html: html + "<p>Ordinary prose</p>" });
+        await waitRequest(tab);
+        assert(inputGroups(tab.requests[0]).flatMap(group => group.parts).join("|") === "Ordinary prose",
+          "Arch-specific rules applied to " + host);
+      }
+    }],
+    ["ArchWiki edit, preview, special and challenge pages do not send text", async () => {
+      const shared = storage([defaultKey, ["site-policy:wiki.archlinux.org", site(true)]]);
+      for (const [path, classes] of [
+        ["/title/Example?veaction=edit", "mediawiki ns-0 action-view"],
+        ["/index.php?title=Example&action=submit", "mediawiki ns-0 action-view"],
+        ["/title/Special:Watchlist", "mediawiki ns-0 action-view"],
+        ["/index.php?title=Special%3AWatchlist", "mediawiki ns-0 action-view"],
+        ["/", "mediawiki ns-special action-view"],
+        ["/", ""],
+      ]) {
+        const tab = await open({ shared, host: "wiki.archlinux.org", path, html: "<h1 id=firstHeading>Private fixture</h1>",
+          setup: doc => { doc.body.className = classes; } });
+        await noSend(tab, "A protected wiki view sent text on " + path);
+        assert(tab.watches.size === 0, "A protected wiki view started observation on " + path);
+      }
+    }],
     ["existing elements can become translation targets after insertion", async () => {
       const shared = storage([defaultKey, ["enabled-sites", ["example.test", "phoronix.com"]]]);
       const generic = await open({ shared, html: "<div>Late heading</div>" });

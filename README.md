@@ -2,7 +2,9 @@
 
 [한국어](#한국어)
 
-Translate text in place as you scroll. Viewport Translator uses the LLM API you configure and starts with translation disabled on every site. It handles common page elements and has dedicated rules for Reddit, 4chan, Bilibili, Linux.do and Phoronix. On Phoronix it translates headlines, summaries, review listings and article text as they enter the viewport.
+Translate text in place as you scroll. Viewport Translator uses the LLM API you configure and starts with translation disabled on every site. It handles common page elements and has dedicated rules for Reddit, 4chan, Bilibili, Linux.do, Phoronix and Arch Linux. On Phoronix it translates headlines, summaries, review listings and article text as they enter the viewport.
+
+The Arch Linux homepage and its subdomains share a rule for the Arch navigation bar. The homepage translates news, and package detail pages translate descriptions while preserving package names and versions. ArchWiki translates article text, the table of contents and notices. Commands, package references and manual page names keep their original spelling. Enable translation separately on [Arch Linux](https://archlinux.org/) and [ArchWiki](https://wiki.archlinux.org/).
 
 ## Install and use
 
@@ -41,7 +43,9 @@ Report bugs through [GitHub Issues](https://github.com/nobadwordss/viewport-tran
 
 ## 한국어
 
-Viewport Translator는 스크롤하면서 화면에 들어온 텍스트를 웹페이지에서 바로 번역합니다. 일반 웹페이지에 적용할 수 있고, Reddit·4chan·Bilibili·Linux.do·Phoronix에는 전용 규칙을 사용합니다. Phoronix에서는 화면에 들어온 기사 제목과 요약, 리뷰 목록, 기사 본문을 번역합니다. 처음에는 모든 사이트에서 번역이 꺼져 있습니다.
+Viewport Translator는 스크롤하면서 화면에 들어온 텍스트를 웹페이지에서 바로 번역합니다. 일반 웹페이지에 적용할 수 있고, Reddit·4chan·Bilibili·Linux.do·Phoronix·Arch Linux에는 전용 규칙을 사용합니다. Phoronix에서는 화면에 들어온 기사 제목과 요약, 리뷰 목록, 기사 본문을 번역합니다. 처음에는 모든 사이트에서 번역이 꺼져 있습니다.
+
+Arch Linux 홈페이지와 하위 도메인은 상단 공통 메뉴에 같은 번역 규칙을 사용합니다. 홈페이지에서는 뉴스를, 패키지 상세 페이지에서는 설명을 번역하며 패키지 이름과 버전은 원문으로 유지합니다. ArchWiki에서는 문서 본문과 목차, 팁·주의 상자를 번역하고 명령어와 패키지·매뉴얼 페이지 이름은 그대로 표시합니다. [Arch Linux](https://archlinux.org/)와 [ArchWiki](https://wiki.archlinux.org/)에서 각각 번역을 켜면 됩니다.
 
 1. 최신 [Tampermonkey](https://www.tampermonkey.net/)를 설치한 뒤 [Greasy Fork에서 유저스크립트를 설치](https://greasyfork.org/ko/scripts/606658-visible-text-translator)합니다.
 2. Tampermonkey 메뉴에서 **화면 번역 설정**을 열고 번역 언어, 제공자, 모델을 선택합니다. 키가 필요한 제공자는 **API 키 설정…**을 눌러 브라우저 대화상자에 입력합니다. 입력하는 키는 대화상자에 표시됩니다.

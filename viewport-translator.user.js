@@ -5,12 +5,12 @@
 // @name:zh-CN 可见文本翻译器
 // @name:zh-TW 可見文字翻譯器
 // @namespace https://github.com/nobadwordss/viewport-translator
-// @version 0.6.3
-// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes dedicated rules for Reddit, 4chan, Bilibili, Linux.do, and Phoronix.
-// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do, Phoronix 전용 규칙을 지원합니다.
-// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do・Phoronix専用ルールにも対応。
-// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili、Linux.do 和 Phoronix 专用规则。
-// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili、Linux.do 和 Phoronix 專用規則。
+// @version 0.6.4
+// @description Translate visible web text in place with your selected LLM API. Opt in per site. Includes rules for Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux and ArchWiki.
+// @description:ko 선택한 LLM API로 화면의 텍스트를 제자리에서 번역합니다. 사이트별로 직접 켜서 사용하며 Reddit, 4chan, Bilibili, Linux.do, Phoronix, Arch Linux, ArchWiki 전용 규칙을 지원합니다.
+// @description:ja 選択したLLM APIで表示中のテキストをその場で翻訳します。サイトごとに有効化でき、Reddit・4chan・Bilibili・Linux.do・Phoronix・Arch Linux・ArchWikiの専用ルールにも対応。
+// @description:zh-CN 使用所选 LLM API 就地翻译可见文本。按网站主动启用，并内置 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux 和 ArchWiki 专用规则。
+// @description:zh-TW 使用所選的 LLM API 就地翻譯可見文字。按網站自行啟用，並支援 Reddit、4chan、Bilibili、Linux.do、Phoronix、Arch Linux 和 ArchWiki 專用規則。
 // @license MIT
 // @homepageURL https://github.com/nobadwordss/viewport-translator
 // @supportURL https://github.com/nobadwordss/viewport-translator/issues
@@ -628,11 +628,24 @@
     "#main > article > header > a", "#main > article.full > .content",
     "#main > a[href^='/review/']", "#main > strong > a[href^='/review/']",
   ].join(",");
+  const ARCH_NAV_LINK = "#archnavbar #archnavbarlist > li > a[href]";
+  const ARCH_WIKI_TOC = "#vector-toc a.vector-toc-link > .vector-toc-text";
+  const ARCH_PACKAGE_FIELDS = [
+    "#pkg-updates :is(.pkg-name, .pkg-arch)", "#pkgdetails > h2", "#pkginfo td:not([itemprop='description'])",
+    ":is(#pkgdepslist, #pkgreqslist) a", ":is(#pkgfilelist, #pkgsonamelist) li",
+  ].join(",");
+  const ARCH_WIKI_EXCLUDED = [
+    ".mw-editsection", ".vector-toc-numb", ".archwiki-template-pkg", ".archwiki-template-aur", ".archwiki-template-man",
+  ].join(",");
 
   // Tier 1: Generic fallback engine
   const TEXT_BLOCK = [
     "p", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "td", "th", "dt", "dd", "figcaption",
     "[role='heading']", "[role='listitem']", "[role='cell']", "[role='columnheader']", "[role='rowheader']",
+  ].join(",");
+  const ARCH_WIKI_TARGETS = [
+    ARCH_NAV_LINK, ARCH_WIKI_TOC, "#firstHeading", `#mw-content-text :is(${TEXT_BLOCK})`,
+    "#mw-content-text .archwiki-template-box",
   ].join(",");
   const GENERIC_EXCLUDED = [
     "nav", "footer", "aside",
@@ -1290,7 +1303,9 @@
   const isBilibili = isMobileBilibili || /^(?:(?:www|search)\.)?bilibili\.com$/.test(location.hostname);
   const isLinuxDo = /^(?:www\.)?linux\.do$/.test(location.hostname);
   const isPhoronix = /^(?:www\.)?phoronix\.com$/.test(canonicalHost);
-  // Phoronix adds editorial targets to the generic engine and uses its layout exclusions.
+  const isArchLinux = /(?:^|\.)archlinux\.org$/.test(canonicalHost);
+  const isArchWiki = canonicalHost === "wiki.archlinux.org";
+  // Phoronix and Arch Linux use the generic engine's layout exclusions.
   const isGeneric = !isReddit && !is4chan && !isBilibili && !isLinuxDo;
   // Keep opt-in for each mobile subdomain explicit, including existing preferences.
   const CURRENT_SITE = isMobileReddit || isMobileBilibili ? location.hostname
@@ -1308,6 +1323,8 @@
   const selector = isMobileBilibili ? `${BILI_MOBILE_TARGETS},${TEXT_BLOCK}`
     : isMobileReddit ? `${REDDIT_TARGETS},${TEXT_BLOCK}`
     : isPhoronix ? `${TEXT_BLOCK},${PHORONIX_TARGETS}`
+    : isArchWiki ? ARCH_WIKI_TARGETS
+    : isArchLinux ? `${TEXT_BLOCK},${ARCH_NAV_LINK},#news .article-content`
     : isLinuxDo ? LINUX_DO_TARGETS
     : isBilibili ? BILI_TARGETS : isReddit ? REDDIT_TARGETS : is4chan ? CHAN_TARGETS : TEXT_BLOCK;
   const targetAttributes = selector === TEXT_BLOCK ? ["role"] : TARGET_ATTRIBUTES;
@@ -1384,6 +1401,12 @@
   }
 
   function browsePage(path) {
+    if (isArchWiki) {
+      const params = new URLSearchParams(location.search);
+      return !params.has("veaction") && params.getAll("action").every(action => action === "view") &&
+        !/^\/(?:title\/|index\.php\/)?Special:/i.test(path) &&
+        !params.getAll("title").some(title => /^Special:/i.test(title));
+    }
     if (isBilibili) {
       if (isMobileBilibili) return true;
       const page = path.replace(/^\/(?:zh-Hans|zh-Hant|en|ja|ko)(?=\/|$)/, "") || "/";
@@ -1452,6 +1475,7 @@
     const path = normalizePath(location.pathname);
     if (!path || !document.body || document.documentElement.matches(ADULT_MARKER) ||
       document.body.matches(ADULT_MARKER) || document.querySelector(`${PRIVATE_PAGE},${PAGE_ADULT_MARKER}`)) return false;
+    if (isArchWiki && !document.body.matches(".mediawiki.action-view:not(.ns-special)")) return false;
     for (const input of document.querySelectorAll(PRIVATE_INPUT)) {
       if (input.getClientRects().length && !input.closest("[hidden], [aria-hidden='true'], [inert]") &&
         input.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false) return false;
@@ -2070,6 +2094,10 @@
     if (isLinuxDo) {
       if (element.closest(LINUX_DO_EXCLUDED)) return true;
       return false;
+    }
+    if (isArchLinux) {
+      if (element.closest(isArchWiki ? ARCH_WIKI_EXCLUDED : ARCH_PACKAGE_FIELDS)) return true;
+      if (element.closest(ARCH_NAV_LINK) || (isArchWiki && element.closest(ARCH_WIKI_TOC))) return false;
     }
     if (isGeneric || isMobileSite) {
       if (element.closest(GENERIC_EXCLUDED)) return true;
